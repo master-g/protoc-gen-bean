@@ -1,0 +1,21 @@
+syntax = "proto2";
+package proto.hello;
+import "common.proto";
+option java_package = "com.acme.model.protobuf";
+
+enum Greeting {
+  NONE = 0;
+  MR = 1;
+  MRS = 2;
+  MISS = 3; // cool
+}
+
+// Hello message
+message Hello {
+  required common.RspHead header = 1;
+  required Greeting greeting = 2;
+  required string name = 3;
+  optional bytes sig = 4;
+}
+
+message World { repeated Hello hello = 1; }
