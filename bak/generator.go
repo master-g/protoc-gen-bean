@@ -46,7 +46,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -219,14 +218,6 @@ func (e *ExtensionDescriptor) DescName() string {
 	return "E_" + strings.Join(typeName, "_")
 }
 
-// ImportedDescriptor describes a type that has been publicly imported from another file.
-type ImportedDescriptor struct {
-	common
-	o Object
-}
-
-func (id *ImportedDescriptor) TypeName() []string { return id.o.TypeName() }
-
 // FileDescriptor describes an protocol buffer descriptor file (.proto).
 // It includes slices of all the messages and enums defined within it.
 // Those slices are constructed by WrapTypes.
@@ -235,7 +226,7 @@ type FileDescriptor struct {
 	desc []*Descriptor          // All the messages defined in this file.
 	enum []*EnumDescriptor      // All the enums defined in this file.
 	ext  []*ExtensionDescriptor // All the top-level extensions defined in this file.
-	imp  []*ImportedDescriptor  // All types defined in files publicly imported by this file.
+	imp  []string               // All packages imported by this file.
 
 	// Comments, stored as a map of path (comma-separated integers) to the comment.
 	comments map[string]*descriptor.SourceCodeInfo_Location
@@ -538,10 +529,8 @@ type Generator struct {
 	Request  *plugin.CodeGeneratorRequest  // The input.
 	Response *plugin.CodeGeneratorResponse // The output.
 
-	Param             map[string]string // Command-line parameters.
-	PackageImportPath string            // Go import path of the package we're generating code for
-	ImportPrefix      string            // String to prefix to imported package file names.
-	ImportMap         map[string]string // Mapping from .proto file name to import path
+	Param     map[string]string // Command-line parameters.
+	ImportMap map[string]string // Mapping from .proto file name to import path
 
 	Pkg map[string]string // The names under which we import support packages
 
@@ -597,10 +586,6 @@ func (g *Generator) CommandLineParameters(parameter string) {
 	pluginList := "none" // Default list of plugin names to enable (empty means all).
 	for k, v := range g.Param {
 		switch k {
-		case "import_prefix":
-			g.ImportPrefix = v
-		case "import_path":
-			g.PackageImportPath = v
 		case "plugins":
 			pluginList = v
 		default:
@@ -662,57 +647,6 @@ func RegisterUniquePackageName(pkg string, f *FileDescriptor) string {
 	return pkg
 }
 
-var isGoKeyword = map[string]bool{
-	"break":       true,
-	"case":        true,
-	"chan":        true,
-	"const":       true,
-	"continue":    true,
-	"default":     true,
-	"else":        true,
-	"defer":       true,
-	"fallthrough": true,
-	"for":         true,
-	"func":        true,
-	"go":          true,
-	"goto":        true,
-	"if":          true,
-	"import":      true,
-	"interface":   true,
-	"map":         true,
-	"package":     true,
-	"range":       true,
-	"return":      true,
-	"select":      true,
-	"struct":      true,
-	"switch":      true,
-	"type":        true,
-	"var":         true,
-}
-
-// defaultGoPackage returns the package name to use,
-// derived from the import path of the package we're building code for.
-func (g *Generator) defaultGoPackage() string {
-	p := g.PackageImportPath
-	if i := strings.LastIndex(p, "/"); i >= 0 {
-		p = p[i+1:]
-	}
-	if p == "" {
-		return ""
-	}
-
-	p = strings.Map(badToDot, p)
-	// Identifier must not be keyword: insert _.
-	if isGoKeyword[p] {
-		p = "_" + p
-	}
-	// Identifier must not begin with digit: insert _.
-	if r, _ := utf8.DecodeRuneInString(p); unicode.IsDigit(r) {
-		p = "_" + p
-	}
-	return p
-}
-
 // SetPackageNames sets the package name for this run.
 // The package name must agree across all files being generated.
 // It also defines unique package names for all imported files.
@@ -731,15 +665,6 @@ func (g *Generator) SetPackageNames() {
 			} else if thisPkg != pkg {
 				g.Fail("inconsistent package names:", thisPkg, pkg)
 			}
-		}
-	}
-
-	// If we don't have an explicit java_package option but we have an
-	// import path, use that.
-	if !explicit {
-		p := g.defaultGoPackage()
-		if p != "" {
-			pkg, explicit = p, true
 		}
 	}
 
@@ -952,21 +877,13 @@ func wrapExtensions(file *descriptor.FileDescriptorProto) []*ExtensionDescriptor
 	return sl
 }
 
-// Return a slice of all the types that are publicly imported into this file.
-func wrapImported(file *descriptor.FileDescriptorProto, g *Generator) (sl []*ImportedDescriptor) {
-	for _, index := range file.PublicDependency {
-		df := g.fileByName(file.Dependency[index])
-		for _, d := range df.desc {
-			if d.GetOptions().GetMapEntry() {
-				continue
-			}
-			sl = append(sl, &ImportedDescriptor{common{file}, d})
-		}
-		for _, e := range df.enum {
-			sl = append(sl, &ImportedDescriptor{common{file}, e})
-		}
-		for _, ext := range df.ext {
-			sl = append(sl, &ImportedDescriptor{common{file}, ext})
+// Return a slice of all the packages that are imported into this file.
+func wrapImported(file *descriptor.FileDescriptorProto, g *Generator) (sl []string) {
+	for _, index := range file.Dependency {
+		df := g.fileByName(index)
+		pkg := df.GetOptions().GetJavaPackage()
+		if pkg != "" {
+			sl = append(sl, pkg)
 		}
 	}
 	return
@@ -1018,37 +935,7 @@ func (g *Generator) ObjectNamed(typeName string) Object {
 		g.Fail("can't find object with type", typeName)
 	}
 
-	// If the file of this object isn't a direct dependency of the current file,
-	// or in the current file, then this object has been publicly imported into
-	// a dependency of the current file.
-	// We should return the ImportedDescriptor object for it instead.
-	direct := *o.File().Name == *g.file.Name
-	if !direct {
-		for _, dep := range g.file.Dependency {
-			if *g.fileByName(dep).Name == *o.File().Name {
-				direct = true
-				break
-			}
-		}
-	}
-	if !direct {
-		found := false
-	Loop:
-		for _, dep := range g.file.Dependency {
-			df := g.fileByName(*g.fileByName(dep).Name)
-			for _, td := range df.imp {
-				if td.o == o {
-					// Found it!
-					o = td
-					found = true
-					break Loop
-				}
-			}
-		}
-		if !found {
-			log.Printf("protoc-gen-bean: WARNING: failed finding publicly imported dependency for %v, used in %v", typeName, *g.file.Name)
-		}
-	}
+	// TODO
 
 	return o
 }
@@ -1154,17 +1041,10 @@ func (g *Generator) generate(file *FileDescriptor) {
 	g.file = g.FileOf(file.FileDescriptorProto)
 	g.usedPackages = make(map[string]bool)
 
-	if g.file.index == 0 {
-		// For one file in the package, assert version compatibility.
-		g.P("// This is a compile-time assertion to ensure that this generated file")
-		g.P("// is compatible with the proto package it is being compiled against.")
-		g.P("// A compilation error at this line likely means your copy of the")
-		g.P("// proto package needs to be updated.")
-		g.P()
-	}
 	for _, td := range g.file.imp {
 		g.generateImported(td)
 	}
+	// TODO: generate system imports if needed, like array etc
 	for _, enum := range g.file.enum {
 		g.generateEnum(enum)
 	}
@@ -1189,7 +1069,6 @@ func (g *Generator) generate(file *FileDescriptor) {
 	rem := g.Buffer
 	g.Buffer = new(bytes.Buffer)
 	g.generateHeader()
-	g.generateImports()
 	if !g.writeOutput {
 		return
 	}
@@ -1274,77 +1153,9 @@ func (g *Generator) weak(i int32) bool {
 	return false
 }
 
-// Generate the imports
-func (g *Generator) generateImports() {
-	// We almost always need a proto import.  Rather than computing when we
-	// do, which is tricky when there's a plugin, just import it and
-	// reference it later. The same argument applies to the fmt and math packages.
-	g.P("import " + g.Pkg["proto"] + " " + strconv.Quote(g.ImportPrefix+"github.com/golang/protobuf/proto"))
-	g.P("import " + g.Pkg["fmt"] + ` "fmt"`)
-	g.P("import " + g.Pkg["math"] + ` "math"`)
-	for i, s := range g.file.Dependency {
-		fd := g.fileByName(s)
-		// Do not import our own package.
-		if fd.PackageName() == g.packageName {
-			continue
-		}
-		filename := fd.javaFileName()
-		// By default, import path is the dirname of the Go filename.
-		importPath := path.Dir(filename)
-		if substitution, ok := g.ImportMap[s]; ok {
-			importPath = substitution
-		}
-		importPath = g.ImportPrefix + importPath
-		// Skip weak imports.
-		if g.weak(int32(i)) {
-			g.P("// skipping weak import ", fd.PackageName(), " ", strconv.Quote(importPath))
-			continue
-		}
-		// We need to import all the dependencies, even if we don't reference them,
-		// because other code and tools depend on having the full transitive closure
-		// of protocol buffer types in the binary.
-		pname := fd.PackageName()
-		if _, ok := g.usedPackages[pname]; !ok {
-			pname = "_"
-		}
-		g.P("import ", pname, " ", strconv.Quote(importPath))
-	}
-	g.P()
-	// TODO: may need to worry about uniqueness across plugins
-	for _, p := range plugins {
-		p.GenerateImports(g.file)
-		g.P()
-	}
-	g.P("// Reference imports to suppress errors if they are not otherwise used.")
-	g.P("var _ = ", g.Pkg["proto"], ".Marshal")
-	g.P("var _ = ", g.Pkg["fmt"], ".Errorf")
-	g.P("var _ = ", g.Pkg["math"], ".Inf")
-	g.P()
-}
-
-func (g *Generator) generateImported(id *ImportedDescriptor) {
-	// Don't generate public import symbols for files that we are generating
-	// code for, since those symbols will already be in this package.
-	// We can't simply avoid creating the ImportedDescriptor objects,
-	// because g.genFiles isn't populated at that stage.
-	tn := id.TypeName()
-	sn := tn[len(tn)-1]
-	df := g.FileOf(id.o.File())
-	filename := *df.Name
-	for _, fd := range g.genFiles {
-		if *fd.Name == filename {
-			g.P("// Ignoring public import of ", sn, " from ", filename)
-			g.P()
-			return
-		}
-	}
-	g.P("// ", sn, " from public import ", filename)
-	g.usedPackages[df.PackageName()] = true
-
-	for _, sym := range df.exported[id.o] {
-		sym.GenerateAlias(g, df.PackageName())
-	}
-
+func (g *Generator) generateImported(id string) {
+	// TODO
+	g.P("import ", strconv.Quote(id)+";")
 	g.P()
 }
 
@@ -1476,17 +1287,9 @@ func (g *Generator) goTag(message *Descriptor, field *descriptor.FieldDescriptor
 		case descriptor.FieldDescriptorProto_TYPE_ENUM:
 			// For enums we need to provide the integer constant.
 			obj := g.ObjectNamed(field.GetTypeName())
-			if id, ok := obj.(*ImportedDescriptor); ok {
-				// It is an enum that was publicly imported.
-				// We need the underlying type.
-				obj = id.o
-			}
 			enum, ok := obj.(*EnumDescriptor)
 			if !ok {
 				log.Printf("obj is a %T", obj)
-				if id, ok := obj.(*ImportedDescriptor); ok {
-					log.Printf("id.o is a %T", id.o)
-				}
 				g.Fail("unknown enum type", CamelCaseSlice(obj.TypeName()))
 			}
 			defaultValue = enum.integerValueAsString(defaultValue)
@@ -1498,9 +1301,6 @@ func (g *Generator) goTag(message *Descriptor, field *descriptor.FieldDescriptor
 		// We avoid using obj.PackageName(), because we want to use the
 		// original (proto-world) package name.
 		obj := g.ObjectNamed(field.GetTypeName())
-		if id, ok := obj.(*ImportedDescriptor); ok {
-			obj = id.o
-		}
 		enum = ",enum="
 		if pkg := obj.File().GetPackage(); pkg != "" {
 			enum += pkg + "."
@@ -1964,12 +1764,7 @@ func (g *Generator) generateMessage(message *Descriptor) {
 			// Must be an enum.  Need to construct the prefixed name.
 			obj := g.ObjectNamed(field.GetTypeName())
 			var enum *EnumDescriptor
-			if id, ok := obj.(*ImportedDescriptor); ok {
-				// The enum type has been publicly imported.
-				enum, _ = id.o.(*EnumDescriptor)
-			} else {
-				enum, _ = obj.(*EnumDescriptor)
-			}
+			enum, _ = obj.(*EnumDescriptor)
 			if enum == nil {
 				log.Printf("don't know how to generate constant for %s", fieldname)
 				continue
@@ -2137,12 +1932,7 @@ func (g *Generator) generateMessage(message *Descriptor) {
 				// not zero.
 				obj := g.ObjectNamed(field.GetTypeName())
 				var enum *EnumDescriptor
-				if id, ok := obj.(*ImportedDescriptor); ok {
-					// The enum type has been publicly imported.
-					enum, _ = id.o.(*EnumDescriptor)
-				} else {
-					enum, _ = obj.(*EnumDescriptor)
-				}
+				enum, _ = obj.(*EnumDescriptor)
 				if enum == nil {
 					log.Printf("don't know how to generate getter for %s", field.GetName())
 					continue
@@ -2538,13 +2328,7 @@ func (g *Generator) generateExtension(ext *ExtensionDescriptor) {
 
 	extObj := g.ObjectNamed(*ext.Extendee)
 	var extDesc *Descriptor
-	if id, ok := extObj.(*ImportedDescriptor); ok {
-		// This is extending a publicly imported message.
-		// We need the underlying type for goTag.
-		extDesc = id.o.(*Descriptor)
-	} else {
-		extDesc = extObj.(*Descriptor)
-	}
+	extDesc = extObj.(*Descriptor)
 	extendedType := "*" + g.TypeName(extObj) // always use the original
 	field := ext.FieldDescriptorProto
 	fieldType, wireType := g.GoType(ext.parent, field)
