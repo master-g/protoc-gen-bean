@@ -1383,7 +1383,7 @@ func (g *Generator) TypeNameWithPackage(obj Object) string {
 	return obj.PackageName() + CamelCaseSlice(obj.TypeName())
 }
 
-// GoType returns a string representing the type name, and the wire type
+// JavaType returns a string representing the type name, and the wire type
 func (g *Generator) GoType(message *Descriptor, field *descriptor.FieldDescriptorProto) (typ string, wire string) {
 	// TODO: Options.
 	switch *field.Type {

@@ -7,4 +7,4 @@ SET parent=%~dp0
 ECHO ON
 go build
 move protoc-gen-bean.exe protoc-gen-bean
-protoc.exe -I=. --plugin=protoc-gen-bean --bean_out temp common.proto hello.proto
+protoc.exe -I=. --plugin=protoc-gen-bean --bean_out vopackage=vo:temp common.proto hello.proto

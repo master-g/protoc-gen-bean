@@ -16,6 +16,11 @@ message Hello {
   required Greeting greeting = 2;
   required string name = 3;
   optional bytes sig = 4;
+  message Mark {
+    optional int32 code = 1;
+    optional string pay_load = 2;
+  }
+  optional Mark cool = 5;
 }
 
 message World { repeated Hello hello = 1; }
