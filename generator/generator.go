@@ -47,6 +47,8 @@ import (
 	"time"
 	"unicode"
 
+	"errors"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
@@ -367,7 +369,8 @@ type Generator struct {
 	indent           string
 	writeOutput      bool
 
-	VoPackage string // java value object package
+	VoPackage        string // java value object package
+	ConverterPackage string
 }
 
 // New creates a new generator and allocates the request and response protobufs.
@@ -397,6 +400,7 @@ func (g *Generator) Fail(msgs ...string) {
 // in the parameter (a member of the request protobuf) into a key/value map.
 // It then sets file name mappings defined by those entries.
 func (g *Generator) CommandLineParameters(parameter string) {
+	g.Error(errors.New("shit"), parameter)
 	g.Param = make(map[string]string)
 	for _, p := range strings.Split(parameter, ",") {
 		if i := strings.Index(p, "="); i < 0 {
@@ -411,6 +415,8 @@ func (g *Generator) CommandLineParameters(parameter string) {
 		switch k {
 		case "vopackage":
 			g.VoPackage = v
+		case "cvtpackage":
+			g.ConverterPackage = v
 		default:
 			if len(k) > 0 && k[0] == 'M' {
 				g.ImportMap[k[1:]] = v
@@ -1007,7 +1013,8 @@ func (g *Generator) GenerateAllBeans() {
 
 func (g *Generator) GenerateAllConverters() {
 	for _, file := range g.allFiles {
-		if len(file.enum) != 0 && file.GetOptions().GetJavaOuterClassname() != "" {
+		clsName := file.GetOptions().GetJavaOuterClassname()
+		if len(file.enum) != 0 && clsName != "" {
 		}
 	}
 }
