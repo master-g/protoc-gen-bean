@@ -1005,15 +1005,11 @@ func (g *Generator) GenerateAllBeans() {
 	}
 }
 
-// FileOf return the FileDescriptor for this FileDescriptorProto.
-func (g *Generator) FileOf(fd *descriptor.FileDescriptorProto) *FileDescriptor {
+func (g *Generator) GenerateAllConverters() {
 	for _, file := range g.allFiles {
-		if file.FileDescriptorProto == fd {
-			return file
+		if len(file.enum) != 0 && file.GetOptions().GetJavaOuterClassname() != "" {
 		}
 	}
-	g.Fail("could not find file in table:", fd.GetName())
-	return nil
 }
 
 // PrintComments prints any comments from the source .proto file.
@@ -1036,16 +1032,6 @@ func (g *Generator) PrintComments(path string) bool {
 
 func (g *Generator) fileByName(filename string) *FileDescriptor {
 	return g.allFilesByName[filename]
-}
-
-// weak returns whether the ith import of the current file is a weak import.
-func (g *Generator) weak(i int32) bool {
-	for _, j := range g.file.WeakDependency {
-		if j == i {
-			return true
-		}
-	}
-	return false
 }
 
 // TypeName is the printed name appropriate for an item. If the object is in the current file,
