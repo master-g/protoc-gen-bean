@@ -137,7 +137,7 @@ const (
 )
 
 func dump(data []byte) {
-	f, err := os.Create("./temp/shit.txt")
+	f, err := os.Create("./temp/dump.txt")
 	if err != nil {
 		os.Exit(0)
 	}
