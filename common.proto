@@ -1,6 +1,7 @@
 syntax = "proto2";
 package proto.common;
 option java_package = "com.acme.model.protobuf";
+option java_outer_classname = "PbCommon";
 
 enum Cmd {
   kHandshakeReq = 0x1;

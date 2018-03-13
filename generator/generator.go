@@ -47,7 +47,7 @@ import (
 	"time"
 	"unicode"
 
-	"errors"
+	"sort"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -296,28 +296,53 @@ func (d *FileDescriptor) javaPackageName() (name string, explicit bool) {
 	return baseName(d.GetName()), false
 }
 
-// javaFileName returns the output name for the generated Go file.
-func (d *FileDescriptor) javaFileName() string {
-	name := *d.Name
-	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
-		name = name[:len(name)-len(ext)]
-	}
-	name += ".java"
-
-	// Does the file have a "java_package" option?
-	// If it does, it may override the filename.
-	if impPath, _, ok := d.javaPackageOption(); ok && impPath != "" {
-		// Replace the existing dirname with the declared import path.
-		_, name = path.Split(name)
-		name = path.Join(impPath, name)
-		return name
+// converterPackageName returns the output name for the generated Go file.
+func (d *FileDescriptor) converterPackageName(g *Generator) string {
+	if d.GetOptions().GetJavaPackage() != "" {
+		pkg := d.GetOptions().GetJavaPackage()
+		sl := strings.Split(pkg, ".")
+		sl = sl[:len(sl)-1]
+		if g.ConverterPackage != "" {
+			sl = append(sl, g.ConverterPackage)
+		}
+		return strings.Join(sl, ".")
 	}
 
-	return name
+	return ""
 }
 
-func (d *FileDescriptor) addExport(obj Object, sym symbol) {
-	d.exported[obj] = append(d.exported[obj], sym)
+func (d *FileDescriptor) pb2beanClassName() string {
+	clsName := d.GetOptions().GetJavaOuterClassname()
+	if strings.HasPrefix(clsName, "Pb") {
+		clsName = clsName[2:]
+		return clsName + "Pb2JavaBean"
+	}
+	return ""
+}
+
+func (d *FileDescriptor) bean2pbClassName() string {
+	clsName := d.GetOptions().GetJavaOuterClassname()
+	if strings.HasPrefix(clsName, "Pb") {
+		clsName = clsName[2:]
+		return clsName + "JavaBean2Pb"
+	}
+	return ""
+}
+
+func (d *FileDescriptor) converterFileName(g *Generator) (b2p, p2b string) {
+	pkgName := d.converterPackageName(g)
+	b2pCls := d.bean2pbClassName()
+	p2bCls := d.pb2beanClassName()
+	if pkgName != "" && b2pCls != "" && p2bCls != "" {
+		sl := strings.Split(pkgName, ".")
+		sl = append(sl, b2pCls+".java")
+		b2pCls = path.Join(sl...)
+		sl = sl[:len(sl)-1]
+		sl = append(sl, p2bCls+".java")
+		p2bCls = path.Join(sl...)
+		return b2pCls, p2bCls
+	}
+	return "", ""
 }
 
 // symbol is an interface representing an exported Go symbol.
@@ -353,10 +378,7 @@ type Generator struct {
 	Request  *plugin.CodeGeneratorRequest  // The input.
 	Response *plugin.CodeGeneratorResponse // The output.
 
-	Param     map[string]string // Command-line parameters.
-	ImportMap map[string]string // Mapping from .proto file name to import path
-
-	Pkg map[string]string // The names under which we import support packages
+	Param map[string]string // Command-line parameters.
 
 	packageName      string                     // What we're calling ourselves.
 	allFiles         []*FileDescriptor          // All files in the tree
@@ -369,6 +391,8 @@ type Generator struct {
 	indent           string
 	writeOutput      bool
 
+	type2file        map[string]*FileDescriptor
+	type2pkg         map[string]string
 	VoPackage        string // java value object package
 	ConverterPackage string
 }
@@ -400,7 +424,6 @@ func (g *Generator) Fail(msgs ...string) {
 // in the parameter (a member of the request protobuf) into a key/value map.
 // It then sets file name mappings defined by those entries.
 func (g *Generator) CommandLineParameters(parameter string) {
-	g.Error(errors.New("shit"), parameter)
 	g.Param = make(map[string]string)
 	for _, p := range strings.Split(parameter, ",") {
 		if i := strings.Index(p, "="); i < 0 {
@@ -410,17 +433,12 @@ func (g *Generator) CommandLineParameters(parameter string) {
 		}
 	}
 
-	g.ImportMap = make(map[string]string)
 	for k, v := range g.Param {
 		switch k {
 		case "vopackage":
 			g.VoPackage = v
 		case "cvtpackage":
 			g.ConverterPackage = v
-		default:
-			if len(k) > 0 && k[0] == 'M' {
-				g.ImportMap[k[1:]] = v
-			}
 		}
 	}
 }
@@ -468,42 +486,9 @@ func RegisterUniquePackageName(pkg string, f *FileDescriptor) string {
 func (g *Generator) SetPackageNames() {
 	// Register the name for this package.  It will be the first name
 	// registered so is guaranteed to be unmodified.
-	pkg, explicit := g.genFiles[0].javaPackageName()
-
-	// Check all files for an explicit java_package option.
-	for _, f := range g.genFiles {
-		thisPkg, thisExplicit := f.javaPackageName()
-		if thisExplicit {
-			if !explicit {
-				// Let this file's java_package option serve for all input files.
-				pkg, explicit = thisPkg, true
-			} else if thisPkg != pkg {
-				g.Fail("inconsistent package names:", thisPkg, pkg)
-			}
-		}
-	}
-
-	// If there was no java_package and no import path to use,
-	// double-check that all the inputs have the same implicit
-	// Go package name.
-	if !explicit {
-		for _, f := range g.genFiles {
-			thisPkg, _ := f.javaPackageName()
-			if thisPkg != pkg {
-				g.Fail("inconsistent package names:", thisPkg, pkg)
-			}
-		}
-	}
+	pkg, _ := g.genFiles[0].javaPackageName()
 
 	g.packageName = RegisterUniquePackageName(pkg, g.genFiles[0])
-
-	// Register the support package names. They might collide with the
-	// name of a package we import.
-	g.Pkg = map[string]string{
-		"fmt":   RegisterUniquePackageName("fmt", nil),
-		"math":  RegisterUniquePackageName("math", nil),
-		"proto": RegisterUniquePackageName("proto", nil),
-	}
 
 AllFiles:
 	for _, f := range g.allFiles {
@@ -794,33 +779,25 @@ func (g *Generator) Out() {
 
 // Beans
 
-var type2pkg = map[string]string{}
-
-func (g *Generator) buildType2PackageMap(file *FileDescriptor) {
-	for _, e := range file.enum {
-		type2pkg[e.KeyAsField()] = fmt.Sprintf("%v.%v", e.BeanPackageName(g), e.GetName())
-	}
-	for _, m := range file.desc {
-		type2pkg[m.KeyAsField()] = fmt.Sprintf("%v.%v", m.BeanPackageName(g), m.GetName())
-	}
-}
-
 func (g *Generator) generateBeanHeader(obj interface{}) {
 	var pkgName string
-	var file *descriptor.FileDescriptorProto
+	var fileName string
 	if msg, ok := obj.(*Descriptor); ok {
 		pkgName = msg.BeanPackageName(g)
-		file = msg.file
+		fileName = msg.file.GetName()
 	} else if enum, ok := obj.(*EnumDescriptor); ok {
 		pkgName = enum.BeanPackageName(g)
-		file = enum.file
+		fileName = enum.file.GetName()
+	} else if fd, ok := obj.(*FileDescriptor); ok {
+		pkgName = fd.converterPackageName(g)
+		fileName = fd.GetName()
 	}
 	g.P("package ", pkgName, ";")
 	g.P()
 	g.P("// Code generated by protoc-gen-bean. DO NOT EDIT.")
 	g.P("// ", time.Now().Format("2006-01-02 Mon 15:04:05 UTC-0700"))
 	g.P("//")
-	g.P("//     ", file.GetName())
+	g.P("//     ", fileName)
 	g.P("//")
 }
 
@@ -879,9 +856,7 @@ func (g *Generator) compileEnum(enum *EnumDescriptor) {
 	g.P("}")
 }
 
-func (g *Generator) compileImport(msg *Descriptor) {
-	prjImports := make(map[string]bool)
-	sysImports := make(map[string]bool)
+func (g *Generator) extractImports(msg *Descriptor, prj, sys map[string]bool) {
 	fields := make([]*descriptor.FieldDescriptorProto, 0)
 	for _, m := range msg.nested {
 		for _, f := range m.Field {
@@ -894,21 +869,40 @@ func (g *Generator) compileImport(msg *Descriptor) {
 	}
 
 	for _, f := range fields {
-		if isRepeated(f) && !sysImports["java.util.List"] {
-			sysImports["java.util.List"] = true
+		if isRepeated(f) && !sys["java.util.List"] {
+			sys["java.util.List"] = true
 		}
-		if f.GetTypeName() != "" {
-			prjImports[type2pkg[f.GetTypeName()]] = true
+		k := f.GetTypeName()
+		v, ok := g.type2pkg[k]
+		if ok {
+			prj[v] = true
 		}
 	}
+}
 
+func (g *Generator) compileImport(msg *Descriptor) {
+	prjImports := make(map[string]bool)
+	sysImports := make(map[string]bool)
+	g.extractImports(msg, prjImports, sysImports)
+
+	keys := []string{}
 	for k, _ := range prjImports {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
 		g.P("import ", k, ";")
 	}
 	if len(prjImports) != 0 {
 		g.P()
 	}
+
+	keys = []string{}
 	for k, _ := range sysImports {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
 		g.P("import ", k, ";")
 	}
 	g.P()
@@ -987,8 +981,32 @@ func (g *Generator) compileBean(obj interface{}) string {
 	return g.String()
 }
 
+func (g *Generator) buildType2PackageMap(f *FileDescriptor) {
+	if g.type2pkg == nil {
+		g.type2pkg = make(map[string]string)
+	}
+	if g.type2file == nil {
+		g.type2file = make(map[string]*FileDescriptor)
+	}
+	for _, e := range f.enum {
+		if e.IsInner() {
+			continue
+		}
+		g.type2file[e.KeyAsField()] = f
+		g.type2pkg[e.KeyAsField()] = fmt.Sprintf("%v.%v", e.BeanPackageName(g), e.GetName())
+	}
+	for _, m := range f.desc {
+		if m.IsInner() {
+			continue
+		}
+		g.type2file[m.KeyAsField()] = f
+		g.type2pkg[m.KeyAsField()] = fmt.Sprintf("%v.%v", m.BeanPackageName(g), m.GetName())
+	}
+}
+
 func (g *Generator) GenerateAllBeans() {
 	for _, file := range g.allFiles {
+		g.file = file
 		g.buildType2PackageMap(file)
 		for _, e := range file.enum {
 			if !e.IsInner() {
@@ -1011,10 +1029,143 @@ func (g *Generator) GenerateAllBeans() {
 	}
 }
 
+func (g *Generator) generateConverterImport(file *FileDescriptor) {
+	prjImports := make(map[string]bool)
+	sysImports := make(map[string]bool)
+	for _, d := range file.desc {
+		g.extractImports(d, prjImports, sysImports)
+	}
+
+	if sysImports["java.util.List"] {
+		sysImports["java.util.ArrayList"] = true
+	}
+
+	prjImports["com.google.protobuf.InvalidProtocolBufferException"] = true
+	desc := make([]*Descriptor, len(file.desc))
+	copy(desc, file.desc)
+	for _, d := range file.desc {
+		for _, m := range d.nested {
+			desc = append(desc, m)
+		}
+	}
+	for _, m := range desc {
+		javaPkg := m.file.GetOptions().GetJavaPackage()
+		javaClsName := m.file.GetOptions().GetJavaOuterClassname()
+		if javaPkg != "" && javaClsName != "" {
+			prjImports[javaPkg+"."+javaClsName] = true
+		}
+	}
+
+	keys := []string{}
+	for k, _ := range prjImports {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		g.P("import ", k, ";")
+	}
+	if len(prjImports) != 0 {
+		g.P()
+	}
+
+	keys = []string{}
+	for k, _ := range sysImports {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		g.P("import ", k, ";")
+	}
+	g.P()
+}
+
+func (g *Generator) generateBean2Pb(file *FileDescriptor) {
+	g.Reset()
+	g.writeOutput = true
+	g.generateBeanHeader(file)
+	g.P()
+	//g.P(file.converterPackageName(g))
+}
+
+func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) {
+	if d.IsInner() {
+		g.P("shit")
+		return
+	}
+	g.P("public static ", d.BeanName(), " to", d.BeanName(), "(byte[] data) {")
+	g.In()
+	g.P("try {")
+	g.In()
+	pbType := file.GetOptions().GetJavaOuterClassname() + "." + d.BeanName()
+	pbBeanName := "pb" + d.BeanName()
+	g.P(pbType, " ", pbBeanName, " = ", pbType, ".parseFrom(data);")
+	g.P()
+	varName := LowerCaseInitial(d.BeanName())
+	g.P(d.BeanName(), " ", varName, " = new ", d.BeanName(), "();")
+	for _, f := range d.Field {
+		prefix := fmt.Sprintf("%v.%v = ", varName, CamelCase(f.GetName()))
+		if isRepeated(f) {
+			g.P(prefix, "new ArrayList<>();")
+		}
+		if isMessage(f) {
+			cvt := g.type2file[f.GetTypeName()].pb2beanClassName()
+			memberName := strings.Title(CamelCase(f.GetName()))
+			pbVar := pbBeanName + ".get" + memberName + "()"
+			g.P(prefix, cvt, ".to", memberName, "(", pbVar, ");")
+		} else {
+			g.P(prefix, pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
+		}
+	}
+
+	g.P()
+	g.P("return ", varName, ";")
+	g.Out()
+	g.P("} catch (InvalidProtocolBufferException e) {")
+	g.In()
+	g.P("e.printStackTrace();")
+	g.Out()
+	g.P("}")
+	g.P()
+	g.P("return null;")
+	g.Out()
+	g.P("}")
+	g.P()
+}
+
+func (g *Generator) generatePb2Bean(file *FileDescriptor) {
+	g.Reset()
+	g.writeOutput = true
+	g.generateBeanHeader(file)
+	g.P()
+	g.generateConverterImport(file)
+	g.P("public class ", file.pb2beanClassName(), " {")
+	g.In()
+
+	for _, m := range file.desc {
+		g.generatePbMessage2Bean(file, m)
+	}
+
+	g.Out()
+	g.P("}")
+}
+
 func (g *Generator) GenerateAllConverters() {
 	for _, file := range g.allFiles {
-		clsName := file.GetOptions().GetJavaOuterClassname()
-		if len(file.enum) != 0 && clsName != "" {
+		if len(file.desc) == 0 {
+			continue
+		}
+		b2pf, p2bf := file.converterFileName(g)
+		if b2pf != "" && p2bf != "" {
+			g.generateBean2Pb(file)
+			g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+				Name:    proto.String(b2pf),
+				Content: proto.String(g.String()),
+			})
+			g.generatePb2Bean(file)
+			g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+				Name:    proto.String(p2bf),
+				Content: proto.String(g.String()),
+			})
 		}
 	}
 }
@@ -1233,8 +1384,15 @@ func CamelCase(s string) string {
 }
 
 // CamelCaseSlice is like CamelCase, but the argument is a slice of strings to
-// be joined with "_".
-func CamelCaseSlice(elem []string) string { return CamelCase(strings.Join(elem, "_")) }
+// be joined with ".".
+func CamelCaseSlice(elem []string) string { return CamelCase(strings.Join(elem, ".")) }
+
+func LowerCaseInitial(s string) string {
+	if s == "" {
+		return ""
+	}
+	return strings.ToLower(s[0:1]) + s[1:]
+}
 
 // dottedSlice turns a sliced name into a dotted name.
 func dottedSlice(elem []string) string { return strings.Join(elem, ".") }
@@ -1252,6 +1410,16 @@ func isRequired(field *descriptor.FieldDescriptorProto) bool {
 // Is this field repeated?
 func isRepeated(field *descriptor.FieldDescriptorProto) bool {
 	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_REPEATED
+}
+
+func isMessage(field *descriptor.FieldDescriptorProto) bool {
+	if field.Type == nil {
+		return false
+	}
+	if *field.Type == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
+		return true
+	}
+	return false
 }
 
 // Is this field a scalar numeric type?
