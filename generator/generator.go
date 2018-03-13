@@ -1104,14 +1104,19 @@ func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) 
 	g.P(d.BeanName(), " ", varName, " = new ", d.BeanName(), "();")
 	for _, f := range d.Field {
 		prefix := fmt.Sprintf("%v.%v = ", varName, CamelCase(f.GetName()))
-		if isRepeated(f) {
-			g.P(prefix, "new ArrayList<>();")
-		}
 		if isMessage(f) {
 			cvt := g.type2file[f.GetTypeName()].pb2beanClassName()
 			memberName := strings.Title(CamelCase(f.GetName()))
-			pbVar := pbBeanName + ".get" + memberName + "()"
-			g.P(prefix, cvt, ".to", memberName, "(", pbVar, ");")
+			if isRepeated(f) {
+				g.P(prefix, "new ArrayList<>();")
+				g.P("for (int i = 0; i < ", pbBeanName, ".get", memberName, "Count(); i++) {")
+				g.In()
+				g.Out()
+				g.P("}")
+			} else {
+				pbVar := pbBeanName + ".get" + memberName + "().toByteArray()"
+				g.P(prefix, cvt, ".to", memberName, "(", pbVar, ");")
+			}
 		} else {
 			g.P(prefix, pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
 		}

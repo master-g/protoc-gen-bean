@@ -12,3 +12,8 @@ message RspHead {
   optional string msg = 1;
   optional int32 err_code = 2;
 }
+
+message AnotherMsg {
+  optional string text = 1;
+  optional int32 value = 2;
+}

@@ -7,14 +7,14 @@ package com.acme.model.vo.common;
 //
 
 
-public class RspHead {
-    public String msg;
-    public int errCode;
+public class AnotherMsg {
+    public String text;
+    public int value;
     
     @Override
     public String toString() {
-        return "RspHead{" +
-                "msg='" + msg + '\'' + ","
-                "errCode=" + errCode + "}"
+        return "AnotherMsg{" +
+                "text='" + text + '\'' + ","
+                "value=" + value + "}"
     }
 }

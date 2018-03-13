@@ -19,4 +19,7 @@ message Hello {
   optional bytes sig = 4;
 }
 
-message World { repeated Hello hello = 1; }
+message World {
+  repeated Hello hello = 1;
+  repeated common.AnotherMsg elements = 2;
+}
