@@ -1041,18 +1041,39 @@ func (g *Generator) generateConverterImport(file *FileDescriptor) {
 	}
 
 	prjImports["com.google.protobuf.InvalidProtocolBufferException"] = true
-	desc := make([]*Descriptor, len(file.desc))
-	copy(desc, file.desc)
+	desc := make([]*Descriptor, 0)
 	for _, d := range file.desc {
 		for _, m := range d.nested {
 			desc = append(desc, m)
 		}
+		desc = append(desc, d)
 	}
 	for _, m := range desc {
+		// vo packages
+		voPkg, ok := g.type2pkg[m.KeyAsField()]
+		if ok {
+			prjImports[voPkg] = true
+		}
+		// protoc gen java packages
 		javaPkg := m.file.GetOptions().GetJavaPackage()
 		javaClsName := m.file.GetOptions().GetJavaOuterClassname()
 		if javaPkg != "" && javaClsName != "" {
 			prjImports[javaPkg+"."+javaClsName] = true
+		}
+		for _, f := range m.Field {
+			typ := f.GetTypeName()
+			if typ == "" {
+				continue
+			}
+			ref := g.type2file[typ]
+			if ref == file {
+				continue
+			}
+			javaPkg := ref.GetOptions().GetJavaPackage()
+			javaClsName := ref.GetOptions().GetJavaOuterClassname()
+			if javaPkg != "" && javaClsName != "" {
+				prjImports[javaPkg+"."+javaClsName] = true
+			}
 		}
 	}
 
@@ -1084,12 +1105,10 @@ func (g *Generator) generateBean2Pb(file *FileDescriptor) {
 	g.writeOutput = true
 	g.generateBeanHeader(file)
 	g.P()
-	//g.P(file.converterPackageName(g))
 }
 
 func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) {
 	if d.IsInner() {
-		g.P("shit")
 		return
 	}
 	g.P("public static ", d.BeanName(), " to", d.BeanName(), "(byte[] data) {")
@@ -1103,19 +1122,28 @@ func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) 
 	varName := LowerCaseInitial(d.BeanName())
 	g.P(d.BeanName(), " ", varName, " = new ", d.BeanName(), "();")
 	for _, f := range d.Field {
-		prefix := fmt.Sprintf("%v.%v = ", varName, CamelCase(f.GetName()))
+		prefix := varName + "." + CamelCase(f.GetName())
 		if isMessage(f) {
 			cvt := g.type2file[f.GetTypeName()].pb2beanClassName()
 			memberName := strings.Title(CamelCase(f.GetName()))
 			if isRepeated(f) {
-				g.P(prefix, "new ArrayList<>();")
+				g.P(prefix, " = new ArrayList<>();")
 				g.P("for (int i = 0; i < ", pbBeanName, ".get", memberName, "Count(); i++) {")
 				g.In()
+				ref := g.type2file[f.GetTypeName()]
+				refPbType := ref.GetOptions().GetJavaOuterClassname() + "." + g.FieldTypeName(f)
+				refVarName := LowerCaseInitial(g.FieldTypeName(f)) + "_"
+				refCvt := ""
+				if ref != file {
+					refCvt = cvt + "."
+				}
+				g.P(refPbType, " ", refVarName, " = ", pbBeanName, ".get", memberName, "(i);")
+				g.P(prefix, ".add(", refCvt, "to", g.FieldTypeName(f), "(", refVarName, ".toByteArray()));")
 				g.Out()
 				g.P("}")
 			} else {
 				pbVar := pbBeanName + ".get" + memberName + "().toByteArray()"
-				g.P(prefix, cvt, ".to", memberName, "(", pbVar, ");")
+				g.P(prefix, " = ", cvt, ".to", memberName, "(", pbVar, ");")
 			}
 		} else {
 			g.P(prefix, pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
@@ -1210,6 +1238,14 @@ func (g *Generator) TypeName(obj Object) string {
 // name even if the object is in our own package.
 func (g *Generator) TypeNameWithPackage(obj Object) string {
 	return obj.PackageName() + CamelCaseSlice(obj.TypeName())
+}
+
+func (g *Generator) FieldTypeName(field *descriptor.FieldDescriptorProto) string {
+	if field.GetTypeName() == "" {
+		return ""
+	}
+	sl := strings.Split(field.GetTypeName(), ".")
+	return sl[len(sl)-1]
 }
 
 // JavaType returns a string representing the type name, and the wire type
