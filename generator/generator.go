@@ -1146,7 +1146,7 @@ func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) 
 				g.P(prefix, " = ", cvt, ".to", memberName, "(", pbVar, ");")
 			}
 		} else {
-			g.P(prefix, pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
+			g.P(prefix, " = ", pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
 		}
 	}
 
