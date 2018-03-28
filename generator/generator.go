@@ -923,9 +923,11 @@ func (g *Generator) compileMessage(msg *Descriptor) {
 	g.In()
 	for i, f := range msg.Field {
 		varName := CamelCase(f.GetName())
-		tail := ","
+		var tail string
 		if i == len(msg.Field)-1 {
-			tail = "}"
+			tail = strconv.Quote("}") + ";"
+		} else {
+			tail = strconv.Quote(",") + " +"
 		}
 		if g.JavaType(msg, f) == "String" {
 			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", strconv.Quote(tail))
