@@ -930,9 +930,9 @@ func (g *Generator) compileMessage(msg *Descriptor) {
 			tail = strconv.Quote(",") + " +"
 		}
 		if g.JavaType(msg, f) == "String" {
-			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", strconv.Quote(tail))
+			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
 		} else {
-			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", strconv.Quote(tail))
+			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
 		}
 	}
 	g.Out()
