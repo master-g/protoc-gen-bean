@@ -1279,7 +1279,7 @@ func (g *Generator) JavaType(message *Descriptor, field *descriptor.FieldDescrip
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		typ = "int"
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		typ = "bool"
+		typ = "boolean"
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		typ = "String"
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
