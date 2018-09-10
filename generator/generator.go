@@ -923,14 +923,16 @@ func (g *Generator) compileMessage(msg *Descriptor) {
 	g.In()
 	for i, f := range msg.Field {
 		varName := CamelCase(f.GetName())
-		tail := ","
+		var tail string
 		if i == len(msg.Field)-1 {
-			tail = "}"
+			tail = strconv.Quote("}") + ";"
+		} else {
+			tail = strconv.Quote(",") + " +"
 		}
 		if g.JavaType(msg, f) == "String" {
-			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", strconv.Quote(tail))
+			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
 		} else {
-			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", strconv.Quote(tail))
+			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
 		}
 	}
 	g.Out()
@@ -1146,7 +1148,7 @@ func (g *Generator) generatePbMessage2Bean(file *FileDescriptor, d *Descriptor) 
 				g.P(prefix, " = ", cvt, ".to", memberName, "(", pbVar, ");")
 			}
 		} else {
-			g.P(prefix, pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
+			g.P(prefix, " = ", pbBeanName, ".get", strings.Title(CamelCase(f.GetName())), "();")
 		}
 	}
 
@@ -1277,7 +1279,7 @@ func (g *Generator) JavaType(message *Descriptor, field *descriptor.FieldDescrip
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		typ = "int"
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		typ = "bool"
+		typ = "boolean"
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		typ = "String"
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:

@@ -13,7 +13,11 @@
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
 
-# idea
+# Idea
 .idea
 
+# Test folder
+test/com
+
+# Binary
 protoc-gen-bean
