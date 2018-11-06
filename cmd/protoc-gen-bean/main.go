@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/master-g/protoc-gen-bean/generator"
+	"github.com/master-g/protoc-gen-bean/internal/generator"
 )
 
 func dump(data []byte) {
