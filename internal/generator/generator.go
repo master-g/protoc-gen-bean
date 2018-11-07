@@ -909,36 +909,38 @@ func (g *Generator) compileImport(msg *Descriptor) {
 
 func (g *Generator) compileMessage(msg *Descriptor) {
 	g.P("public class ", msg.BeanName(), " {")
-	g.In()
+	g.In() // >
 	for _, f := range msg.Field {
 		g.P("public ", g.JavaType(msg, f), " ", CamelCase(f.GetName()), ";")
 	}
-	g.P()
-	g.P("@Override")
-	g.P("public String toString() {")
-	g.In()
-	g.P("return ", strconv.Quote(msg.BeanName()+"{"), " +")
-	g.In()
-	g.In()
-	for i, f := range msg.Field {
-		varName := CamelCase(f.GetName())
-		var tail string
-		if i == len(msg.Field)-1 {
-			tail = strconv.Quote("}") + ";"
-		} else {
-			tail = strconv.Quote(",") + " +"
+	if len(msg.Field) > 0 {
+		g.P()
+		g.P("@Override")
+		g.P("public String toString() {")
+		g.In() // >>
+		g.P("return ", strconv.Quote(msg.BeanName()+"{"), " +")
+		g.In() // >>>
+		g.In() // >>>>
+		for i, f := range msg.Field {
+			varName := CamelCase(f.GetName())
+			var tail string
+			if i == len(msg.Field)-1 {
+				tail = strconv.Quote("}") + ";"
+			} else {
+				tail = strconv.Quote(",") + " +"
+			}
+			if g.JavaType(msg, f) == "String" {
+				g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
+			} else {
+				g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
+			}
 		}
-		if g.JavaType(msg, f) == "String" {
-			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
-		} else {
-			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
-		}
+		g.Out() // >>>
+		g.Out() // >>
+		g.Out() // >
+		g.P("}")
 	}
-	g.Out()
-	g.Out()
-	g.Out()
-	g.P("}")
-	g.Out()
+	g.Out() //
 }
 
 func (g *Generator) compileMessages(msg *Descriptor) {
@@ -952,6 +954,7 @@ func (g *Generator) compileMessages(msg *Descriptor) {
 		for _, e := range msg.enums {
 			g.compileEnum(e)
 			g.P("}")
+			g.P()
 		}
 		g.Out()
 	}
@@ -962,6 +965,7 @@ func (g *Generator) compileMessages(msg *Descriptor) {
 		for _, m := range msg.nested {
 			g.compileMessage(m)
 			g.P("}")
+			g.P()
 		}
 		g.Out()
 	}
@@ -979,6 +983,8 @@ func (g *Generator) compileBean(obj interface{}) string {
 	} else if msg, ok := obj.(*Descriptor); ok {
 		g.compileMessages(msg)
 	}
+	g.P("// end of file")
+	g.P()
 	return g.String()
 }
 
@@ -1181,6 +1187,7 @@ func (g *Generator) generatePb2Bean(file *FileDescriptor) {
 
 	g.Out()
 	g.P("}")
+	g.P()
 }
 
 func (g *Generator) GenerateAllConverters() {
