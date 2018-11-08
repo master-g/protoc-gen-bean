@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -152,11 +153,6 @@ type FileDescriptor struct {
 	// Comments, stored as a map of path (comma-separated integers) to the comment.
 	comments map[string]*descriptor.SourceCodeInfo_Location
 
-	// The full list of symbols that are exported,
-	// as a map from the exported object to its symbols.
-	// This is used for supporting public imports.
-	exported map[Object][]symbol
-
 	importPath  JavaImportPath  // Import path of this file's package.
 	packageName JavaPackageName // Name of this file's Java package.
 
@@ -215,6 +211,104 @@ func (d *FileDescriptor) javaFileName(pathType pathType) string {
 	return name
 }
 
-func (d *FileDescriptor) addExport(obj Object, sym symbol) {
-	d.exported[obj] = append(d.exported[obj], sym)
+// Construct the Descriptor
+func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *FileDescriptor, index int) *Descriptor {
+	d := &Descriptor{
+		common:          common{file},
+		DescriptorProto: desc,
+		parent:          parent,
+		index:           index,
+	}
+	if parent == nil {
+		d.path = fmt.Sprintf("%d,%d", messagePath, index)
+	} else {
+		d.path = fmt.Sprintf("%s,%d,%d", parent.path, messageMessagePath, index)
+	}
+
+	// The only way to distinguish a group from a message is whether
+	// the containing message has a TYPE_GROUP field that matches.
+	if parent != nil {
+		parts := d.TypeName()
+		if file.Package != nil {
+			parts = append([]string{*file.Package}, parts...)
+		}
+		exp := "." + strings.Join(parts, ".")
+		for _, field := range parent.Field {
+			if field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
+				d.group = true
+				break
+			}
+		}
+	}
+
+	for _, field := range desc.Extension {
+		d.ext = append(d.ext, &ExtensionDescriptor{common{file}, field, d})
+	}
+
+	return d
+}
+
+// Return a slice of all the Descriptors defined within this file
+func wrapDescriptors(file *FileDescriptor) []*Descriptor {
+	sl := make([]*Descriptor, 0, len(file.MessageType)+10)
+	for i, desc := range file.MessageType {
+		sl = wrapThisDescriptor(sl, desc, nil, file, i)
+	}
+	return sl
+}
+
+// Wrap this Descriptor, recursively
+func wrapThisDescriptor(sl []*Descriptor, desc *descriptor.DescriptorProto, parent *Descriptor, file *FileDescriptor, index int) []*Descriptor {
+	sl = append(sl, newDescriptor(desc, parent, file, index))
+	me := sl[len(sl)-1]
+	for i, nested := range desc.NestedType {
+		sl = wrapThisDescriptor(sl, nested, me, file, i)
+	}
+	return sl
+}
+
+// Construct the EnumDescriptor
+func newEnumDescriptor(desc *descriptor.EnumDescriptorProto, parent *Descriptor, file *FileDescriptor, index int) *EnumDescriptor {
+	ed := &EnumDescriptor{
+		common:              common{file},
+		EnumDescriptorProto: desc,
+		parent:              parent,
+		index:               index,
+	}
+	if parent == nil {
+		ed.path = fmt.Sprintf("%d,%d", enumPath, index)
+	} else {
+		ed.path = fmt.Sprintf("%s,%d,%d", parent.path, messageEnumPath, index)
+	}
+	return ed
+}
+
+// Return a slice of all the EnumDescriptors defined within this file
+func wrapEnumDescriptors(file *FileDescriptor, descs []*Descriptor) []*EnumDescriptor {
+	sl := make([]*EnumDescriptor, 0, len(file.EnumType)+10)
+	// Top-level enums.
+	for i, enum := range file.EnumType {
+		sl = append(sl, newEnumDescriptor(enum, nil, file, i))
+	}
+	// Enums within messages. Enums within embedded messages appear in the outer-most message.
+	for _, nested := range descs {
+		for i, enum := range nested.EnumType {
+			sl = append(sl, newEnumDescriptor(enum, nested, file, i))
+		}
+	}
+	return sl
+}
+
+func extractComments(file *FileDescriptor) {
+	file.comments = make(map[string]*descriptor.SourceCodeInfo_Location)
+	for _, loc := range file.GetSourceCodeInfo().GetLocation() {
+		if loc.LeadingComments == nil {
+			continue
+		}
+		var p []string
+		for _, n := range loc.Path {
+			p = append(p, strconv.Itoa(int(n)))
+		}
+		file.comments[strings.Join(p, ",")] = loc
+	}
 }

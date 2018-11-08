@@ -37,17 +37,17 @@ type Generator struct {
 
 	Pkg map[string]string // The names under which we import support packages
 
-	outputImportPath GoImportPath                   // Package we're generating code for.
-	allFiles         []*FileDescriptor              // All files in the tree
-	allFilesByName   map[string]*FileDescriptor     // All files by filename.
-	genFiles         []*FileDescriptor              // Those files we will generate output for.
-	file             *FileDescriptor                // The file we are compiling now.
-	packageNames     map[GoImportPath]GoPackageName // Imported package names in the current file.
-	usedPackages     map[GoImportPath]bool          // Packages used in current file.
-	usedPackageNames map[GoPackageName]bool         // Package names used in the current file.
-	addedImports     map[GoImportPath]bool          // Additional imports to emit.
-	typeNameToObject map[string]Object              // Key is a fully-qualified name in input syntax.
-	init             []string                       // Lines to emit in the init function.
+	outputImportPath JavaImportPath                     // Package we're generating code for.
+	allFiles         []*FileDescriptor                  // All files in the tree
+	allFilesByName   map[string]*FileDescriptor         // All files by filename.
+	genFiles         []*FileDescriptor                  // Those files we will generate output for.
+	file             *FileDescriptor                    // The file we are compiling now.
+	packageNames     map[JavaImportPath]JavaPackageName // Imported package names in the current file.
+	usedPackages     map[JavaImportPath]bool            // Packages used in current file.
+	usedPackageNames map[JavaPackageName]bool           // Package names used in the current file.
+	addedImports     map[JavaImportPath]bool            // Additional imports to emit.
+	typeNameToObject map[string]Object                  // Key is a fully-qualified name in input syntax.
+	init             []string                           // Lines to emit in the init function.
 	indent           string
 	pathType         pathType // How to generate output filenames.
 	writeOutput      bool
@@ -147,21 +147,21 @@ func (g *Generator) CommandLineParameters(parameter string) {
 // If its file is in a different package, it returns the package name we're using for this file, plus ".".
 // Otherwise it returns the empty string.
 func (g *Generator) DefaultPackageName(obj Object) string {
-	importPath := obj.GoImportPath()
+	importPath := obj.JavaImportPath()
 	if importPath == g.outputImportPath {
 		return ""
 	}
-	return string(g.GoPackageName(importPath)) + "."
+	return string(g.JavaPackageName(importPath)) + "."
 }
 
-// GoPackageName returns the name used for a package.
-func (g *Generator) GoPackageName(importPath GoImportPath) GoPackageName {
+// JavaPackageName returns the name used for a package.
+func (g *Generator) JavaPackageName(importPath JavaImportPath) JavaPackageName {
 	if name, ok := g.packageNames[importPath]; ok {
 		return name
 	}
 	name := cleanPackageName(baseName(string(importPath)))
 	for i, orig := 1, name; g.usedPackageNames[name] || isGoPredeclaredIdentifier[string(name)]; i++ {
-		name = orig + GoPackageName(strconv.Itoa(i))
+		name = orig + JavaPackageName(strconv.Itoa(i))
 	}
 	g.packageNames[importPath] = name
 	g.usedPackageNames[name] = true
@@ -170,12 +170,12 @@ func (g *Generator) GoPackageName(importPath GoImportPath) GoPackageName {
 
 // AddImport adds a package to the generated file's import section.
 // It returns the name used for the package.
-func (g *Generator) AddImport(importPath GoImportPath) GoPackageName {
+func (g *Generator) AddImport(importPath JavaImportPath) JavaPackageName {
 	g.addedImports[importPath] = true
-	return g.GoPackageName(importPath)
+	return g.JavaPackageName(importPath)
 }
 
-var globalPackageNames = map[GoPackageName]bool{
+var globalPackageNames = map[JavaPackageName]bool{
 	"fmt":   true,
 	"math":  true,
 	"proto": true,
@@ -186,7 +186,7 @@ var globalPackageNames = map[GoPackageName]bool{
 func RegisterUniquePackageName(pkg string, f *FileDescriptor) string {
 	name := cleanPackageName(pkg)
 	for i, orig := 1, name; globalPackageNames[name]; i++ {
-		name = orig + GoPackageName(strconv.Itoa(i))
+		name = orig + JavaPackageName(strconv.Itoa(i))
 	}
 	globalPackageNames[name] = true
 	return string(name)
@@ -264,7 +264,7 @@ var isGoPredeclaredIdentifier = map[string]bool{
 
 // defaultGoPackage returns the package name to use,
 // derived from the import path of the package we're building code for.
-func (g *Generator) defaultGoPackage() GoPackageName {
+func (g *Generator) defaultGoPackage() JavaPackageName {
 	p := g.PackageImportPath
 	if i := strings.LastIndex(p, "/"); i >= 0 {
 		p = p[i+1:]
@@ -278,14 +278,14 @@ func (g *Generator) defaultGoPackage() GoPackageName {
 func (g *Generator) SetPackageNames() {
 	g.outputImportPath = g.genFiles[0].importPath
 
-	defaultPackageNames := make(map[GoImportPath]GoPackageName)
+	defaultPackageNames := make(map[JavaImportPath]JavaPackageName)
 	for _, f := range g.genFiles {
-		if _, p, ok := f.goPackageOption(); ok {
+		if _, p, ok := f.javaPackageOption(); ok {
 			defaultPackageNames[f.importPath] = p
 		}
 	}
 	for _, f := range g.genFiles {
-		if _, p, ok := f.goPackageOption(); ok {
+		if _, p, ok := f.javaPackageOption(); ok {
 			// Source file: option go_package = "quux/bar";
 			f.packageName = p
 		} else if p, ok := defaultPackageNames[f.importPath]; ok {
@@ -350,14 +350,14 @@ func (g *Generator) WrapTypes() {
 			// Command-line: M=foo.proto=quux/bar.
 			//
 			// Explicit mapping of source file to import path.
-			fd.importPath = GoImportPath(substitution)
+			fd.importPath = JavaImportPath(substitution)
 		} else if genFileNames[f.GetName()] && g.PackageImportPath != "" {
 			// Command-line: import_path=quux/bar.
 			//
 			// The import_path flag sets the import path for every file that
 			// we generate code for.
-			fd.importPath = GoImportPath(g.PackageImportPath)
-		} else if p, _, _ := fd.goPackageOption(); p != "" {
+			fd.importPath = JavaImportPath(g.PackageImportPath)
+		} else if p, _, _ := fd.javaPackageOption(); p != "" {
 			// Source file: option go_package = "quux/bar";
 			//
 			// The go_package option sets the import path. Most users should use this.
@@ -366,7 +366,7 @@ func (g *Generator) WrapTypes() {
 			// Source filename.
 			//
 			// Last resort when nothing else is available.
-			fd.importPath = GoImportPath(path.Dir(f.GetName()))
+			fd.importPath = JavaImportPath(path.Dir(f.GetName()))
 		}
 		// We must wrap the descriptors before we wrap the enums
 		fd.desc = wrapDescriptors(fd)
@@ -622,9 +622,9 @@ func (g *Generator) printAtom(v interface{}) {
 		fmt.Fprint(g, v)
 	case *float64:
 		fmt.Fprint(g, *v)
-	case GoPackageName:
+	case JavaPackageName:
 		g.WriteString(string(v))
-	case GoImportPath:
+	case JavaImportPath:
 		g.WriteString(strconv.Quote(string(v)))
 	default:
 		g.Fail(fmt.Sprintf("unknown type in printer: %T", v))
@@ -708,7 +708,7 @@ func (g *Generator) GenerateAllFiles() {
 		if !g.writeOutput {
 			continue
 		}
-		fname := file.goFileName(g.pathType)
+		fname := file.javaFileName(g.pathType)
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(fname),
 			Content: proto.String(g.String()),
@@ -717,7 +717,7 @@ func (g *Generator) GenerateAllFiles() {
 			// Store the generated code annotations in text, as the protoc plugin protocol requires that
 			// strings contain valid UTF-8.
 			g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
-				Name:    proto.String(file.goFileName(g.pathType) + ".meta"),
+				Name:    proto.String(file.javaFileName(g.pathType) + ".meta"),
 				Content: proto.String(proto.CompactTextString(&descriptor.GeneratedCodeInfo{Annotation: g.annotations})),
 			})
 		}
@@ -735,10 +735,10 @@ func (g *Generator) runPlugins(file *FileDescriptor) {
 // supposed to generate.
 func (g *Generator) generate(file *FileDescriptor) {
 	g.file = file
-	g.usedPackages = make(map[GoImportPath]bool)
-	g.packageNames = make(map[GoImportPath]GoPackageName)
-	g.usedPackageNames = make(map[GoPackageName]bool)
-	g.addedImports = make(map[GoImportPath]bool)
+	g.usedPackages = make(map[JavaImportPath]bool)
+	g.packageNames = make(map[JavaImportPath]JavaPackageName)
+	g.usedPackageNames = make(map[JavaPackageName]bool)
+	g.addedImports = make(map[JavaImportPath]bool)
 	for name := range globalPackageNames {
 		g.usedPackageNames[name] = true
 	}
@@ -896,7 +896,7 @@ func (g *Generator) weak(i int32) bool {
 
 // Generate the imports
 func (g *Generator) generateImports() {
-	imports := make(map[GoImportPath]GoPackageName)
+	imports := make(map[JavaImportPath]JavaPackageName)
 	for i, s := range g.file.Dependency {
 		fd := g.fileByName(s)
 		importPath := fd.importPath
@@ -915,14 +915,14 @@ func (g *Generator) generateImports() {
 		// We need to import all the dependencies, even if we don't reference them,
 		// because other code and tools depend on having the full transitive closure
 		// of protocol buffer types in the binary.
-		packageName := g.GoPackageName(importPath)
+		packageName := g.JavaPackageName(importPath)
 		if _, ok := g.usedPackages[importPath]; !ok {
 			packageName = "_"
 		}
 		imports[importPath] = packageName
 	}
 	for importPath := range g.addedImports {
-		imports[importPath] = g.GoPackageName(importPath)
+		imports[importPath] = g.JavaPackageName(importPath)
 	}
 	// We almost always need a proto import.  Rather than computing when we
 	// do, which is tricky when there's a plugin, just import it and
@@ -930,9 +930,9 @@ func (g *Generator) generateImports() {
 	g.P("import (")
 	g.P(g.Pkg["fmt"] + ` "fmt"`)
 	g.P(g.Pkg["math"] + ` "math"`)
-	g.P(g.Pkg["proto"]+" ", GoImportPath(g.ImportPrefix)+"github.com/golang/protobuf/proto")
+	g.P(g.Pkg["proto"]+" ", JavaImportPath(g.ImportPrefix)+"github.com/golang/protobuf/proto")
 	for importPath, packageName := range imports {
-		g.P(packageName, " ", GoImportPath(g.ImportPrefix)+importPath)
+		g.P(packageName, " ", JavaImportPath(g.ImportPrefix)+importPath)
 	}
 	g.P(")")
 	g.P()
@@ -961,7 +961,7 @@ func (g *Generator) generateImported(id *ImportedDescriptor) {
 	g.usedPackages[df.importPath] = true
 
 	for _, sym := range df.exported[id.o] {
-		sym.GenerateAlias(g, filename, g.GoPackageName(df.importPath))
+		sym.GenerateAlias(g, filename, g.JavaPackageName(df.importPath))
 	}
 
 	g.P()
@@ -1132,7 +1132,7 @@ func (g *Generator) goTag(message *Descriptor, field *descriptor.FieldDescriptor
 	}
 	enum := ""
 	if *field.Type == descriptor.FieldDescriptorProto_TYPE_ENUM {
-		// We avoid using obj.GoPackageName(), because we want to use the
+		// We avoid using obj.JavaPackageName(), because we want to use the
 		// original (proto-world) package name.
 		obj := g.ObjectNamed(field.GetTypeName())
 		if id, ok := obj.(*ImportedDescriptor); ok {
@@ -1259,7 +1259,7 @@ func (g *Generator) RecordTypeUse(t string) {
 	if _, ok := g.typeNameToObject[t]; !ok {
 		return
 	}
-	importPath := g.ObjectNamed(t).GoImportPath()
+	importPath := g.ObjectNamed(t).JavaImportPath()
 	if importPath == g.outputImportPath {
 		// Don't record use of objects in our package.
 		return

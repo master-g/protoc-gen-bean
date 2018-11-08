@@ -4,7 +4,7 @@ package generator
 type symbol interface {
 	// GenerateAlias should generate an appropriate alias
 	// for the symbol from the named package.
-	GenerateAlias(g *Generator, filename string, pkg GoPackageName)
+	GenerateAlias(g *Generator, filename string, pkg JavaPackageName)
 }
 
 type messageSymbol struct {
@@ -20,7 +20,7 @@ type getterSymbol struct {
 	genType  bool   // whether typ contains a generated type (message/group/enum)
 }
 
-func (ms *messageSymbol) GenerateAlias(g *Generator, filename string, pkg GoPackageName) {
+func (ms *messageSymbol) GenerateAlias(g *Generator, filename string, pkg JavaPackageName) {
 	g.P("// ", ms.sym, " from public import ", filename)
 	g.P("type ", ms.sym, " = ", pkg, ".", ms.sym)
 	for _, name := range ms.oneofTypes {
@@ -33,7 +33,7 @@ type enumSymbol struct {
 	proto3 bool // Whether this came from a proto3 file.
 }
 
-func (es enumSymbol) GenerateAlias(g *Generator, filename string, pkg GoPackageName) {
+func (es enumSymbol) GenerateAlias(g *Generator, filename string, pkg JavaPackageName) {
 	s := es.name
 	g.P("// ", s, " from public import ", filename)
 	g.P("type ", s, " = ", pkg, ".", s)
@@ -47,7 +47,7 @@ type constOrVarSymbol struct {
 	cast string // if non-empty, a type cast is required (used for enums)
 }
 
-func (cs constOrVarSymbol) GenerateAlias(g *Generator, filename string, pkg GoPackageName) {
+func (cs constOrVarSymbol) GenerateAlias(g *Generator, filename string, pkg JavaPackageName) {
 	v := string(pkg) + "." + cs.sym
 	if cs.cast != "" {
 		v = cs.cast + "(" + v + ")"

@@ -21,6 +21,13 @@ func (p JavaImportPath) String() string { return strconv.Quote(string(p)) }
 // A JavaPackageName is the name of a Java package. e.g., "com.google.protobuf".
 type JavaPackageName string
 
+type pathType int
+
+const (
+	pathTypeImport pathType = iota
+	pathTypeSourceRelative
+)
+
 // Each type we import as a protocol buffer (other than FileDescriptorProto) needs
 // a pointer to the FileDescriptorProto that represents it.  These types achieve that
 // wrapping by placing each Proto inside a struct with the pointer to its File. The
