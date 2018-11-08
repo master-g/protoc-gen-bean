@@ -2,9 +2,13 @@ package generator
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
+
+	"github.com/golang/protobuf/proto"
 
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
@@ -26,8 +30,14 @@ type Generator struct {
 	ValueObjectPackage string // Java value object output package
 	ConverterPackage   string // Java bean converter output package
 
-	allFiles       []*FileDescriptor          // All files in the tree
-	allFilesByName map[string]*FileDescriptor // All files by filename.
+	allFiles         []*FileDescriptor          // All files in the tree
+	allFilesByName   map[string]*FileDescriptor // All files by input filename.
+	genFiles         []*FileDescriptor          // Those files we will generate output for.
+	file             *FileDescriptor            // the file we are compiling now.
+	typeNameToObject map[string]Object          // Key is a fully-qualified name in input syntax.
+	indent           string
+	pathType         pathType // How to generate output filenames.
+	writeOutput      bool
 }
 
 // New creates a new generator and allocates the request and response protobufs.
@@ -106,11 +116,17 @@ func (g *Generator) WrapTypes() {
 	}
 	for _, fd := range g.allFiles {
 		fd.imp = wrapImported(fd, g)
-		for _, v := range fd.imp {
-			log.Println(v.JavaImportPath())
-		}
 	}
 
+	// output single file for all non-nested descriptors and enums
+	g.genFiles = make([]*FileDescriptor, 0, len(g.Request.FileToGenerate))
+	for _, fileName := range g.Request.FileToGenerate {
+		fd := g.allFilesByName[fileName]
+		if fd == nil {
+			g.Fail("could not find file named", fileName)
+		}
+		g.genFiles = append(g.genFiles, fd)
+	}
 }
 
 // Scan the descriptors in this file.  For each one, build the slice of nested descriptors
@@ -157,13 +173,133 @@ func wrapImported(file *FileDescriptor, g *Generator) (sl []*ImportedDescriptor)
 		for _, e := range df.enum {
 			sl = append(sl, &ImportedDescriptor{common{file}, e})
 		}
-		for _, ext := range df.ext {
-			sl = append(sl, &ImportedDescriptor{common{file}, ext})
-		}
 	}
 	return
 }
 
 func (g *Generator) fileByName(filename string) *FileDescriptor {
 	return g.allFilesByName[filename]
+}
+
+// BuildTypeNameMap builds the map from fully qualified type names to objects.
+// The key names for the map come from the input data, which puts a period at the beginning.
+// It should be called after SetPackageNames and before GenerateAllFiles.
+func (g *Generator) BuildTypeNameMap() {
+	g.typeNameToObject = make(map[string]Object)
+	for _, f := range g.allFiles {
+		// The names in this loop are defined by the proto world, not us, so the
+		// package name may be empty.  If so, the dotted package name of X will
+		// be ".X"; otherwise it will be ".pkg.X".
+		dottedPkg := "." + f.GetPackage()
+		if dottedPkg != "." {
+			dottedPkg += "."
+		}
+		for _, enum := range f.enum {
+			name := dottedPkg + dottedSlice(enum.TypeName())
+			g.typeNameToObject[name] = enum
+		}
+		for _, desc := range f.desc {
+			name := dottedPkg + dottedSlice(desc.TypeName())
+			g.typeNameToObject[name] = desc
+		}
+	}
+}
+
+// printAtom prints the (atomic, non-annotation) argument to the generated output.
+func (g *Generator) printAtom(v interface{}) {
+	switch v := v.(type) {
+	case string:
+		g.WriteString(v)
+	case *string:
+		g.WriteString(*v)
+	case bool:
+		fmt.Fprint(g, v)
+	case *bool:
+		fmt.Fprint(g, *v)
+	case int:
+		fmt.Fprint(g, v)
+	case *int32:
+		fmt.Fprint(g, *v)
+	case *int64:
+		fmt.Fprint(g, *v)
+	case float64:
+		fmt.Fprint(g, v)
+	case *float64:
+		fmt.Fprint(g, *v)
+	case JavaPackageName:
+		g.WriteString(string(v))
+	case JavaImportPath:
+		g.WriteString(strconv.Quote(string(v)))
+	default:
+		g.Fail(fmt.Sprintf("unknown type in printer: %T", v))
+	}
+}
+
+// P prints the arguments to the generated output.  It handles strings and int32s, plus
+// handling indirections because they may be *string, etc.  Any inputs of type AnnotatedAtoms may emit
+// annotations in a .meta file in addition to outputting the atoms themselves (if g.annotateCode
+// is true).
+func (g *Generator) P(str ...interface{}) {
+	if !g.writeOutput {
+		return
+	}
+	g.WriteString(g.indent)
+	for _, v := range str {
+		g.printAtom(v)
+	}
+	g.WriteByte('\n')
+}
+
+// In Indents the output one tab stop.
+func (g *Generator) In() { g.indent += "\t" }
+
+// Out unindents the output one tab stop.
+func (g *Generator) Out() {
+	if len(g.indent) > 0 {
+		g.indent = g.indent[1:]
+	}
+}
+
+// GenerateAllFiles generates the output for all the files we're outputting.
+func (g *Generator) GenerateAllFiles() {
+	// Generate the output. The generator runs for every file, even the files
+	// that we don't generate output for, so that we can collate the full list
+	// of exported symbols to support public imports.
+	genFileMap := make(map[*FileDescriptor]bool, len(g.genFiles))
+	for _, file := range g.genFiles {
+		genFileMap[file] = true
+	}
+	for _, file := range g.allFiles {
+		g.Reset()
+		g.writeOutput = genFileMap[file]
+		g.generateBeans(file)
+		if !g.writeOutput {
+			continue
+		}
+		fname := file.javaFileName(g.pathType)
+		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+			Name:    proto.String(fname),
+			Content: proto.String(g.String()),
+		})
+	}
+}
+
+// Fill the response protocol buffer with the generated output for all the descriptors in the file
+func (g *Generator) generateBeans(file *FileDescriptor) {
+	// enums
+	for _, e := range file.enum {
+		g.generateEnum(e)
+	}
+
+}
+
+func (g *Generator) generateEnum(enum *EnumDescriptor) {
+	pkg := fmt.Sprintf("%v.%v", g.ValueObjectPackage, strings.Join(enum.TypeName(), "."))
+	log.Println(pkg)
+}
+
+// Fill the response protocol buffer with the generated output for all the files we're
+// supposed to generate.
+func (g *Generator) generate(file *FileDescriptor) {
+
 }

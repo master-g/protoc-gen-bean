@@ -16,13 +16,12 @@ import (
 type Descriptor struct {
 	common
 	*descriptor.DescriptorProto
-	parent   *Descriptor            // The containing message, if any.
-	nested   []*Descriptor          // Inner messages, if any.
-	enums    []*EnumDescriptor      // Inner enums, if any.
-	ext      []*ExtensionDescriptor // Extensions, if any.
-	typename []string               // Cached typename vector.
-	index    int                    // The index into the container, whether the file or another message.
-	path     string                 // The SourceCodeInfo path as comma-separated integers.
+	parent   *Descriptor       // The containing message, if any.
+	nested   []*Descriptor     // Inner messages, if any.
+	enums    []*EnumDescriptor // Inner enums, if any.
+	typename []string          // Cached typename vector.
+	index    int               // The index into the container, whether the file or another message.
+	path     string            // The SourceCodeInfo path as comma-separated integers.
 	group    bool
 }
 
@@ -97,41 +96,6 @@ func (e *EnumDescriptor) integerValueAsString(name string) string {
 	return ""
 }
 
-// ExtensionDescriptor describes an extension. If it's at top level, its parent will be nil.
-// Otherwise it will be the descriptor of the message in which it is defined.
-type ExtensionDescriptor struct {
-	common
-	*descriptor.FieldDescriptorProto
-	parent *Descriptor // The containing message, if any.
-}
-
-// TypeName returns the elements of the dotted type name.
-// The package name is not part of this name.
-func (e *ExtensionDescriptor) TypeName() (s []string) {
-	name := e.GetName()
-	if e.parent == nil {
-		// top-level extension
-		s = make([]string, 1)
-	} else {
-		pname := e.parent.TypeName()
-		s = make([]string, len(pname)+1)
-		copy(s, pname)
-	}
-	s[len(s)-1] = name
-	return s
-}
-
-// DescName returns the variable name used for the generated descriptor.
-func (e *ExtensionDescriptor) DescName() string {
-	// The full type name.
-	typeName := e.TypeName()
-	// Each scope of the extension is individually CamelCased, and all are joined with "_" with an "E_" prefix.
-	for i, s := range typeName {
-		typeName[i] = CamelCase(s)
-	}
-	return "E_" + strings.Join(typeName, "_")
-}
-
 // ImportedDescriptor describes a type that has been publicly imported from another file.
 type ImportedDescriptor struct {
 	common
@@ -145,10 +109,9 @@ func (id *ImportedDescriptor) TypeName() []string { return id.o.TypeName() }
 // Those slices are constructed by WrapTypes.
 type FileDescriptor struct {
 	*descriptor.FileDescriptorProto
-	desc []*Descriptor          // All the messages defined in this file.
-	enum []*EnumDescriptor      // All the enums defined in this file.
-	ext  []*ExtensionDescriptor // All the top-level extensions defined in this file.
-	imp  []*ImportedDescriptor  // All types defined in files publicly imported by this file.
+	desc []*Descriptor         // All the messages defined in this file.
+	enum []*EnumDescriptor     // All the enums defined in this file.
+	imp  []*ImportedDescriptor // All types defined in files publicly imported by this file.
 
 	// Comments, stored as a map of path (comma-separated integers) to the comment.
 	comments map[string]*descriptor.SourceCodeInfo_Location
@@ -239,10 +202,6 @@ func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *F
 				break
 			}
 		}
-	}
-
-	for _, field := range desc.Extension {
-		d.ext = append(d.ext, &ExtensionDescriptor{common{file}, field, d})
 	}
 
 	return d

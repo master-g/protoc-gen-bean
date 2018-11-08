@@ -34,4 +34,7 @@ func main() {
 	// Create a wrapped version of the Descriptors and EnumDescriptors that
 	// point to the file that defines them.
 	g.WrapTypes()
+	g.BuildTypeNameMap()
+
+	g.GenerateAllFiles()
 }
