@@ -26,6 +26,7 @@ func populateHeaderComment(g *Generator, f *FileDescriptor) {
 		g.P(deprecationComment)
 	}
 	g.P()
+	g.P()
 }
 
 func populateEnum(g *Generator, enum *EnumDescriptor) {
@@ -93,14 +94,22 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 	g.P(" * @deprecated Use {@link #forNumber(int)} instead.")
 	g.P(" */")
 	g.P("@java.lang.Deprecated")
-	g.P("public static ", enum.GetName(), " valueOf(final int value) {")
+	g.P("public static ", enum.GetName(), " valueOf(int value) {")
 	g.In()
-	g.P("for (", enum.GetName(), " c : ", enum.GetName(), ".values()) {")
-	g.In()
-	g.P("if (value == c.code) return c;")
+	g.P("return forNumber(value);")
 	g.Out()
 	g.P("}")
-	g.P("return ", defaultName, ";")
+	g.P()
+	g.P("public static ", enum.GetName(), " forNumber(int value) {")
+	g.In()
+	g.P("switch (value) {")
+	g.In()
+	for _, e := range enum.Value {
+		g.P("case ", e.Number, ": return ", e.GetName(), ";")
+	}
+	g.P("default: return ", defaultName, ";")
+	g.Out()
+	g.P("}")
 	g.Out()
 	g.P("}")
 
@@ -245,7 +254,6 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 		sysImp := make(map[string]string)
 		usrImp := make(map[string]string)
 		extractImports(g, msg, sysImp, usrImp)
-		g.P()
 
 		if len(usrImp) > 0 {
 			usrImpKeys := make([]string, 0, len(usrImp))
@@ -253,12 +261,16 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 				usrImpKeys = append(usrImpKeys, importPath)
 			}
 			sort.Strings(usrImpKeys)
+			addParagraph := false
 			for _, p := range usrImpKeys {
 				if !strings.HasPrefix(p, thisPackage) {
 					g.P("import ", p, ";")
+					addParagraph = true
 				}
 			}
-			g.P()
+			if addParagraph {
+				g.P()
+			}
 		}
 
 		if len(sysImp) > 0 {
@@ -279,7 +291,6 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	}
 
 	g.PrintComments(msg.path)
-	// FIXME: pure encapsulate class doesn't need Serializable and toString
 	serializable := " implements Serializable"
 	staticable := " static"
 	if len(msg.Field) == 0 {
