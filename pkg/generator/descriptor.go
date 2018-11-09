@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"path"
 	"strconv"
 	"strings"
 
@@ -150,30 +149,6 @@ func (d *FileDescriptor) javaPackageOption() (impPath JavaImportPath, pkg JavaPa
 	return
 }
 
-// javaFileName returns the output name for the generated Java file.
-func (d *FileDescriptor) javaFileName(pathType pathType) string {
-	name := *d.Name
-	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
-		name = name[:len(name)-len(ext)]
-	}
-	name += ".java"
-
-	if pathType == pathTypeSourceRelative {
-		return name
-	}
-
-	// Does the file have a "go_package" option?
-	// If it does, it may override the filename.
-	if impPath, _, ok := d.javaPackageOption(); ok && impPath != "" {
-		// Replace the existing dirname with the declared import path.
-		_, name = path.Split(name)
-		name = path.Join(string(impPath), name)
-		return name
-	}
-
-	return name
-}
-
 // Construct the Descriptor
 func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *FileDescriptor, index int) *Descriptor {
 	d := &Descriptor{
@@ -261,7 +236,7 @@ func wrapEnumDescriptors(file *FileDescriptor, descs []*Descriptor) []*EnumDescr
 func extractComments(file *FileDescriptor) {
 	file.comments = make(map[string]*descriptor.SourceCodeInfo_Location)
 	for _, loc := range file.GetSourceCodeInfo().GetLocation() {
-		if loc.LeadingComments == nil {
+		if loc.LeadingComments == nil && loc.TrailingComments == nil {
 			continue
 		}
 		var p []string

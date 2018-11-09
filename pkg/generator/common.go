@@ -2,7 +2,6 @@ package generator
 
 import (
 	"go/build"
-	"strconv"
 
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
@@ -16,7 +15,7 @@ const generatedCodeVersion = 2
 // A JavaImportPath is the import path of a Java package. e.g., "com.google.genproto.protobuf".
 type JavaImportPath string
 
-func (p JavaImportPath) String() string { return strconv.Quote(string(p)) }
+func (p JavaImportPath) String() string { return string(p) }
 
 // A JavaPackageName is the name of a Java package. e.g., "com.google.protobuf".
 type JavaPackageName string
@@ -39,7 +38,7 @@ type common struct {
 	file *FileDescriptor // File this object comes from.
 }
 
-// JavaImportPath is the import path of the Go package containing the type.
+// JavaImportPath is the import path of the Java package containing the type.
 func (c *common) JavaImportPath() JavaImportPath {
 	return c.file.importPath
 }

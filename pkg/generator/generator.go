@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,8 @@ import (
 const (
 	// GeneratorName of this generator
 	GeneratorName = "protoc-gen-bean"
+	// DefaultIndent for tab or space
+	DefaultIndent = "    "
 )
 
 // Generator is the type whose methods generate the output, stored in the associated response structure.
@@ -251,13 +254,63 @@ func (g *Generator) P(str ...interface{}) {
 }
 
 // In Indents the output one tab stop.
-func (g *Generator) In() { g.indent += "\t" }
+func (g *Generator) In() { g.indent += DefaultIndent }
 
 // Out unindents the output one tab stop.
 func (g *Generator) Out() {
 	if len(g.indent) > 0 {
-		g.indent = g.indent[1:]
+		g.indent = g.indent[len(DefaultIndent):]
 	}
+}
+
+// PrintComments prints any comments from the source .proto file.
+// The path is a comma-separated list of integers.
+// It returns an indication of whether any comments were printed.
+// See descriptor.proto for its format.
+func (g *Generator) PrintComments(path string) bool {
+	if !g.writeOutput {
+		return false
+	}
+	if c, ok := g.makeComments(path); ok {
+		g.P(c)
+		return true
+	}
+	return false
+}
+
+// makeComments generates the comment string for the field, no "\n" at the end
+func (g *Generator) makeComments(path string) (string, bool) {
+	loc, ok := g.file.comments[path]
+	if !ok {
+		return "", false
+	}
+	if loc.LeadingComments == nil {
+		return "", false
+	}
+	w := new(bytes.Buffer)
+	nl := ""
+	for _, line := range strings.Split(strings.TrimSuffix(loc.GetLeadingComments(), "\n"), "\n") {
+		fmt.Fprintf(w, "%s//%s", nl, line)
+		nl = "\n"
+	}
+	return w.String(), true
+}
+
+func (g *Generator) tailingComments(path string) (string, bool) {
+	loc, ok := g.file.comments[path]
+	if !ok {
+		return "", false
+	}
+	if loc.TrailingComments == nil {
+		return "", false
+	}
+	w := new(bytes.Buffer)
+	nl := ""
+	for _, line := range strings.Split(strings.TrimSuffix(loc.GetTrailingComments(), "\n"), "\n") {
+		fmt.Fprintf(w, "%s//%s", nl, line)
+		nl = "\n"
+	}
+	return w.String(), true
 }
 
 // GenerateAllFiles generates the output for all the files we're outputting.
@@ -270,32 +323,52 @@ func (g *Generator) GenerateAllFiles() {
 		genFileMap[file] = true
 	}
 	for _, file := range g.allFiles {
-		g.Reset()
 		g.writeOutput = genFileMap[file]
-		g.generateBeans(file)
 		if !g.writeOutput {
 			continue
 		}
-		fname := file.javaFileName(g.pathType)
-		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
-			Name:    proto.String(fname),
-			Content: proto.String(g.String()),
-		})
+		g.generateBeans(file)
 	}
 }
 
 // Fill the response protocol buffer with the generated output for all the descriptors in the file
 func (g *Generator) generateBeans(file *FileDescriptor) {
+	g.file = file
 	// enums
 	for _, e := range file.enum {
-		g.generateEnum(e)
+		if e.parent != nil {
+			// nested enum wraps in its parent descriptor
+			continue
+		}
+		g.Reset()
+
+		populateEnum(g, e)
+
+		fullPath := getFullPathComponents(g, file, e.TypeName())
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.java", e.GetName()))
+		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+			Name:    proto.String(path.Join(fullPath...)),
+			Content: proto.String(g.String()),
+		})
 	}
 
-}
+	// descriptors
+	for _, d := range file.desc {
+		if d.parent != nil {
+			// nested message wraps in its parent descriptor
+			continue
+		}
+		g.Reset()
 
-func (g *Generator) generateEnum(enum *EnumDescriptor) {
-	pkg := fmt.Sprintf("%v.%v", g.ValueObjectPackage, strings.Join(enum.TypeName(), "."))
-	log.Println(pkg)
+		populateDescriptor(g, d)
+
+		fullPath := getFullPathComponents(g, file, d.TypeName())
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.java", d.GetName()))
+		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+			Name:    proto.String(path.Join(fullPath...)),
+			Content: proto.String(g.String()),
+		})
+	}
 }
 
 // Fill the response protocol buffer with the generated output for all the files we're

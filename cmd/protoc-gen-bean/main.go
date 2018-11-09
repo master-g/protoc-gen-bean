@@ -1,9 +1,12 @@
 package main
 
 import (
+	"os"
+
+	"github.com/master-g/protoc-gen-bean/pkg/shared"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/master-g/protoc-gen-bean/pkg/generator"
-	"github.com/master-g/protoc-gen-bean/pkg/shared"
 )
 
 func main() {
@@ -13,7 +16,7 @@ func main() {
 	g := generator.New()
 
 	var data []byte
-	// var err error
+	var err error
 	// data, err = ioutil.ReadAll(os.Stdin)
 	// if err != nil {
 	// 	g.Error(err, "reading input")
@@ -37,4 +40,14 @@ func main() {
 	g.BuildTypeNameMap()
 
 	g.GenerateAllFiles()
+
+	// Send back the results.
+	data, err = proto.Marshal(g.Response)
+	if err != nil {
+		g.Error(err, "failed to marshal output proto")
+	}
+	_, err = os.Stdout.Write(data)
+	if err != nil {
+		g.Error(err, "failed to write output proto")
+	}
 }

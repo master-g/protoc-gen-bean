@@ -15,30 +15,23 @@ func isASCIILower(c byte) bool {
 	return 'a' <= c && c <= 'z'
 }
 
+// Is c an ASCII upper-case letter?
+func isASCIIUpper(c byte) bool {
+	return 'A' <= c && c <= 'Z'
+}
+
 // Is c an ASCII digit?
 func isASCIIDigit(c byte) bool {
 	return '0' <= c && c <= '9'
 }
 
 // CamelCase returns the CamelCased name.
-// If there is an interior underscore followed by a lower case letter,
-// drop the underscore and convert the letter to upper case.
-// There is a remote possibility of this rewrite causing a name collision,
-// but it's so remote we're prepared to pretend it's nonexistent - since the
-// C++ generator lowercases names, it's extremely unlikely to have two fields
-// with different capitalizations.
-// In short, _my_field_name_2 becomes XMyFieldName_2.
 func CamelCase(s string) string {
 	if s == "" {
 		return ""
 	}
 	t := make([]byte, 0, 32)
 	i := 0
-	if s[0] == '_' {
-		// Need a capital letter; drop the '_'.
-		t = append(t, 'X')
-		i++
-	}
 	// Invariant: if the next letter is lower case, it must be converted
 	// to upper case.
 	// That is, we process a word at a time, where words are marked by _ or
@@ -63,6 +56,9 @@ func CamelCase(s string) string {
 			i++
 			t = append(t, s[i])
 		}
+	}
+	if isASCIIUpper(t[0]) {
+		t[0] ^= ' '
 	}
 	return string(t)
 }
@@ -113,6 +109,73 @@ func isScalar(field *descriptor.FieldDescriptorProto) bool {
 	default:
 		return false
 	}
+}
+
+// javaType returns a string representing the type name, and the wire type
+func javaType(field *descriptor.FieldDescriptorProto) string {
+	repeat := isRepeated(field)
+	switch *field.Type {
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		if repeat {
+			return "List<Double>"
+		} else {
+			return "double"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		if repeat {
+			return "List<Float>"
+		} else {
+			return "float"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_INT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
+		if repeat {
+			return "List<Long>"
+		} else {
+			return "long"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_INT32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+		if repeat {
+			return "List<Integer>"
+		} else {
+			return "int"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		if repeat {
+			return "List<Boolean>"
+		} else {
+			return "boolean"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_STRING:
+		if repeat {
+			return "List<String>"
+		} else {
+			return "String"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+		return "byte[]"
+	default:
+		return ""
+	}
+}
+
+func javaFieldName(field *descriptor.FieldDescriptorProto) string {
+	return CamelCase(field.GetName())
 }
 
 // badToUnderscore is the mapping function used to generate Go names from package names,
@@ -210,17 +273,4 @@ func unescape(s string) string {
 	}
 
 	return string(out)
-}
-
-// needsStar returns true if the go type should add a '*' prefix
-func needsStar(typ descriptor.FieldDescriptorProto_Type) bool {
-	switch typ {
-	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		return false
-	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		return false
-	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return false
-	}
-	return true
 }
