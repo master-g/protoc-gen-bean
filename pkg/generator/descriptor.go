@@ -115,7 +115,7 @@ type FileDescriptor struct {
 	// Comments, stored as a map of path (comma-separated integers) to the comment.
 	comments map[string]*descriptor.SourceCodeInfo_Location
 
-	importPath  JavaImportPath  // Import path of this file's package.
+	importPath  JavaImportPath  // Import path of the beans in this file's package.
 	packageName JavaPackageName // Name of this file's Java package.
 
 	proto3 bool // whether to generate proto3 code for this file

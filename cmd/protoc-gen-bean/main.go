@@ -1,12 +1,9 @@
 package main
 
 import (
-	"os"
-
-	"github.com/master-g/protoc-gen-bean/pkg/shared"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/master-g/protoc-gen-bean/pkg/generator"
+	"github.com/master-g/protoc-gen-bean/pkg/shared"
 )
 
 func main() {
@@ -46,7 +43,7 @@ func main() {
 	if err != nil {
 		g.Error(err, "failed to marshal output proto")
 	}
-	_, err = os.Stdout.Write(data)
+	// _, err = os.Stdout.Write(data)
 	if err != nil {
 		g.Error(err, "failed to write output proto")
 	}

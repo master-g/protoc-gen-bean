@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
@@ -100,7 +101,6 @@ func isScalar(field *descriptor.FieldDescriptorProto) bool {
 		descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_BOOL,
 		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_SINT32,
@@ -109,6 +109,23 @@ func isScalar(field *descriptor.FieldDescriptorProto) bool {
 	default:
 		return false
 	}
+}
+
+// paramToJavaPackage convert parameter to a valid java package name
+func paramToJavaPackage(param string) string {
+	if param == "" {
+		return ""
+	}
+
+	param = strings.ToLower(param)
+	for strings.HasPrefix(param, ".") {
+		param = strings.TrimPrefix(param, ".")
+	}
+	for strings.HasSuffix(param, ".") {
+		param = strings.TrimSuffix(param, ".")
+	}
+
+	return param
 }
 
 // javaType returns a string representing the type name, and the wire type
@@ -176,6 +193,24 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 
 func javaFieldName(field *descriptor.FieldDescriptorProto) string {
 	return CamelCase(field.GetName())
+}
+
+// javaConverterName return java protobuf converter class name
+func javaConverterName(file *FileDescriptor) string {
+	javaClsName := ""
+	if file.GetOptions() != nil && file.GetOptions().GetJavaOuterClassname() != "" {
+		javaClsName = file.GetOptions().GetJavaOuterClassname()
+	} else {
+		javaClsName = file.GetPackage()
+		parts := strings.Split(javaClsName, ".")
+		javaClsName = parts[len(parts)-1]
+	}
+
+	if strings.HasPrefix(strings.ToLower(javaClsName), "pb") {
+		javaClsName = javaClsName[2:]
+	}
+	javaClsName = strings.Title(javaClsName)
+	return fmt.Sprintf("%sPb2JavaBean", javaClsName)
 }
 
 // badToUnderscore is the mapping function used to generate Go names from package names,

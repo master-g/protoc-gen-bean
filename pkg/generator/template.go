@@ -245,7 +245,9 @@ func populateToString(g *Generator, msg *Descriptor) {
 }
 
 func populateDescriptor(g *Generator, msg *Descriptor) {
+	// only root messages have package announcement, header and imports
 	if msg.parent == nil {
+		// only root messages have these fancy stuff
 		thisPackage := descriptorPackagePath(g, msg)
 		g.P("package ", thisPackage, ";")
 		populateHeaderComment(g, msg.File())

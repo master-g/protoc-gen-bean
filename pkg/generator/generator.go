@@ -82,10 +82,17 @@ func (g *Generator) CommandLineParameters(parameter string) {
 	for k, v := range g.Param {
 		switch k {
 		case "vopkg":
-			g.ValueObjectPackage = v
+			g.ValueObjectPackage = paramToJavaPackage(v)
 		case "cvtpkg":
-			g.ConverterPackage = v
+			g.ConverterPackage = paramToJavaPackage(v)
 		}
+	}
+
+	if g.ValueObjectPackage == "" {
+		g.Fail("invalid vo package, use --bean_out=vopkg=[package.of.vo], to set")
+	}
+	if g.ConverterPackage == "" {
+		g.ConverterPackage = fmt.Sprintf("%s.%s", g.ValueObjectPackage, "converter")
 	}
 }
 
@@ -104,7 +111,7 @@ func (g *Generator) WrapTypes() {
 
 		// import path of this file
 		fd.importPath = JavaImportPath(strings.Join([]string{
-			strings.ToLower(g.ValueObjectPackage),
+			g.ValueObjectPackage,
 			strings.ToLower(f.GetPackage()),
 		}, "."))
 
@@ -328,6 +335,7 @@ func (g *Generator) GenerateAllFiles() {
 			continue
 		}
 		g.generateBeans(file)
+		g.generateConverters(file)
 	}
 }
 
@@ -373,6 +381,17 @@ func (g *Generator) generateBeans(file *FileDescriptor) {
 
 // Fill the response protocol buffer with the generated output for all the files we're
 // supposed to generate.
-func (g *Generator) generate(file *FileDescriptor) {
+func (g *Generator) generateConverters(file *FileDescriptor) {
+	g.file = file
 
+	javaClsName := javaConverterName(file)
+
+	pathComp := append(strings.Split(g.ConverterPackage, "."), fmt.Sprintf("%s.java", javaClsName))
+	g.Reset()
+	populatePbToBeanConverter(g, file, javaClsName)
+	g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+		Name:    proto.String(path.Join(pathComp...)),
+		Content: proto.String(g.String()),
+	})
+	log.Printf("\n%s", g.String())
 }
