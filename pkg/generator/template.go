@@ -301,7 +301,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	if msg.parent == nil {
 		staticable = ""
 	}
-	g.P("public", staticable, " final ", msg.GetName(), serializable, " {")
+	g.P("public", staticable, " final class ", msg.GetName(), serializable, " {")
 	g.In()
 	// fields
 	for i, field := range msg.Field {
