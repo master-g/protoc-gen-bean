@@ -1,28 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/master-g/protoc-gen-bean/generator"
+	"github.com/master-g/protoc-gen-bean/pkg/generator"
 )
-
-func dump(data []byte) {
-	f, err := os.Create("./temp/dump.txt")
-	if err != nil {
-		os.Exit(0)
-	}
-	for i, v := range data {
-		if i%16 == 0 {
-			f.WriteString("\n")
-		}
-		f.WriteString(fmt.Sprintf("0x%02X,", v))
-	}
-	f.Sync()
-	defer f.Close()
-}
 
 func main() {
 	// Begin by allocating a generator. The request and response structures are stored there
@@ -36,6 +20,8 @@ func main() {
 	if err != nil {
 		g.Error(err, "reading input")
 	}
+	// shared.Dump(data, "dump.txt")
+	// data = shared.ProtocDump
 
 	if err := proto.Unmarshal(data, g.Request); err != nil {
 		g.Error(err, "parsing input proto")
@@ -50,12 +36,9 @@ func main() {
 	// Create a wrapped version of the Descriptors and EnumDescriptors that
 	// point to the file that defines them.
 	g.WrapTypes()
-
-	g.SetPackageNames()
 	g.BuildTypeNameMap()
 
-	g.GenerateAllBeans()
-	g.GenerateAllConverters()
+	g.GenerateAllFiles()
 
 	// Send back the results.
 	data, err = proto.Marshal(g.Response)

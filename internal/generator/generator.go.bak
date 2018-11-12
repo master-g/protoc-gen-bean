@@ -29,6 +29,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// https://github.com/golang/protobuf/blob/master/protoc-gen-go/generator/generator.go
+
 /*
 	The code generator for the plugin for the Google protocol buffer compiler.
 	It generates Java code from the protocol buffer description files read by the
@@ -42,12 +44,11 @@ import (
 	"log"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
-
-	"sort"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -799,6 +800,8 @@ func (g *Generator) generateBeanHeader(obj interface{}) {
 	g.P("//")
 	g.P("//     ", fileName)
 	g.P("//")
+	g.P()
+	g.PrintComments(strconv.Itoa(packagePath))
 }
 
 func (g *Generator) compileEnum(enum *EnumDescriptor) {
@@ -811,6 +814,7 @@ func (g *Generator) compileEnum(enum *EnumDescriptor) {
 	}
 
 	ename := enum.GetName()
+	g.PrintComments(enum.path)
 	g.P("public enum ", ename, " {")
 	g.P()
 	g.In()
@@ -829,12 +833,21 @@ func (g *Generator) compileEnum(enum *EnumDescriptor) {
 		defaultValue = *e.Number - 1
 	}
 	g.P(defaultName, "(", &defaultValue, "),")
+
+	// process values
 	for i, e := range enum.Value {
 		name := *e.Name
+
+		// value comment
+		etorPath := fmt.Sprintf("%s,%d,%d", enum.path, enumValuePath, i)
+		g.PrintComments(etorPath)
+
+		tailComments := g.TailingComments(etorPath)
+
 		if i != len(enum.Value)-1 {
-			g.P(name, "(", e.Number, "),")
+			g.P(name, "(", e.Number, "),", tailComments)
 		} else {
-			g.P(name, "(", e.Number, ");")
+			g.P(name, "(", e.Number, ");", tailComments)
 		}
 	}
 	g.P()
@@ -909,37 +922,51 @@ func (g *Generator) compileImport(msg *Descriptor) {
 }
 
 func (g *Generator) compileMessage(msg *Descriptor) {
+	g.PrintComments(msg.path)
 	g.P("public class ", msg.BeanName(), " {")
-	g.In()
-	for _, f := range msg.Field {
-		g.P("public ", g.JavaType(msg, f), " ", CamelCase(f.GetName()), ";")
-	}
-	g.P()
-	g.P("@Override")
-	g.P("public String toString() {")
-	g.In()
-	g.P("return ", strconv.Quote(msg.BeanName()+"{"), " +")
-	g.In()
-	g.In()
+	g.In() // >
+
 	for i, f := range msg.Field {
-		varName := CamelCase(f.GetName())
-		var tail string
-		if i == len(msg.Field)-1 {
-			tail = strconv.Quote("}") + ";"
-		} else {
-			tail = strconv.Quote(",") + " +"
+		ftorPath := fmt.Sprintf("%s,%d,%d", msg.path, messageFieldPath, i)
+
+		g.PrintComments(ftorPath)
+
+		g.P("// loc:", ftorPath)
+		if loc, ok := g.file.comments[ftorPath]; ok {
+			text := strings.TrimSuffix(loc.GetTrailingComments(), "\n")
+			g.P("// >>> ", text)
 		}
-		if g.JavaType(msg, f) == "String" {
-			g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
-		} else {
-			g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
-		}
+
+		g.P("public ", g.JavaType(msg, f), " ", CamelCase(f.GetName()), ";", g.TailingComments(ftorPath))
 	}
-	g.Out()
-	g.Out()
-	g.Out()
-	g.P("}")
-	g.Out()
+	if len(msg.Field) > 0 {
+		g.P()
+		g.P("@Override")
+		g.P("public String toString() {")
+		g.In() // >>
+		g.P("return ", strconv.Quote(msg.BeanName()+"{"), " +")
+		g.In() // >>>
+		g.In() // >>>>
+		for i, f := range msg.Field {
+			varName := CamelCase(f.GetName())
+			var tail string
+			if i == len(msg.Field)-1 {
+				tail = strconv.Quote("}") + ";"
+			} else {
+				tail = strconv.Quote(",") + " +"
+			}
+			if g.JavaType(msg, f) == "String" {
+				g.P(strconv.Quote(varName+"='"), " + ", varName, " + '\\'' + ", tail)
+			} else {
+				g.P(strconv.Quote(varName+"="), " + ", varName, " + ", tail)
+			}
+		}
+		g.Out() // >>>
+		g.Out() // >>
+		g.Out() // >
+		g.P("}")
+	}
+	g.Out() //
 }
 
 func (g *Generator) compileMessages(msg *Descriptor) {
@@ -952,7 +979,6 @@ func (g *Generator) compileMessages(msg *Descriptor) {
 		g.In()
 		for _, e := range msg.enums {
 			g.compileEnum(e)
-			g.P("}")
 		}
 		g.Out()
 	}
@@ -963,6 +989,7 @@ func (g *Generator) compileMessages(msg *Descriptor) {
 		for _, m := range msg.nested {
 			g.compileMessage(m)
 			g.P("}")
+			g.P()
 		}
 		g.Out()
 	}
@@ -980,6 +1007,8 @@ func (g *Generator) compileBean(obj interface{}) string {
 	} else if msg, ok := obj.(*Descriptor); ok {
 		g.compileMessages(msg)
 	}
+	g.P("// end of file")
+	g.P()
 	return g.String()
 }
 
@@ -1182,6 +1211,7 @@ func (g *Generator) generatePb2Bean(file *FileDescriptor) {
 
 	g.Out()
 	g.P("}")
+	g.P()
 }
 
 func (g *Generator) GenerateAllConverters() {
@@ -1221,6 +1251,21 @@ func (g *Generator) PrintComments(path string) bool {
 		return true
 	}
 	return false
+}
+
+func (g *Generator) TailingComments(path string) string {
+	if !g.writeOutput {
+		return ""
+	}
+	sb := &strings.Builder{}
+	if loc, ok := g.file.comments[path]; ok {
+		text := strings.TrimSuffix(loc.GetTrailingComments(), "\n")
+		for _, line := range strings.Split(text, "\n") {
+			sb.WriteString(" // ")
+			sb.WriteString(strings.TrimPrefix(line, " "))
+		}
+	}
+	return sb.String()
 }
 
 func (g *Generator) fileByName(filename string) *FileDescriptor {

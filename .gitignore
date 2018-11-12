@@ -1,5 +1,6 @@
 # Binaries for programs and plugins
 *.exe
+*.exe~
 *.dll
 *.so
 *.dylib
@@ -10,15 +11,19 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
-.glide/
-
-# Idea
 .idea
 
-# Test folder
-test/com
+# Log
+*.log
+
+# VisualStudio Code
+.vscode/
+
+# Intermediate configuration file
+*.osx.toml
+
+# Executable
+bin/
 
 # Binary
 protoc-gen-bean
-bin/
