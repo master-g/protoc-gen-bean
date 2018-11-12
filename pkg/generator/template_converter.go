@@ -2,7 +2,6 @@ package generator
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -101,7 +100,6 @@ func populateDescriptorConverter(g *Generator, desc *Descriptor, thisConverter s
 				g.Fail("unable to find object for type,", field.GetTypeName())
 			}
 			fieldConverter := javaConverterName(typeObj.File())
-			log.Printf("%s   %s", fieldConverter, thisConverter)
 
 			if strings.Compare(fieldConverter, thisConverter) == 0 {
 				fieldConverter = ""

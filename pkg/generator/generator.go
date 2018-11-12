@@ -393,5 +393,4 @@ func (g *Generator) generateConverters(file *FileDescriptor) {
 		Name:    proto.String(path.Join(pathComp...)),
 		Content: proto.String(g.String()),
 	})
-	log.Printf("\n%s", g.String())
 }
