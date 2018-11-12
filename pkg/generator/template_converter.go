@@ -66,7 +66,7 @@ func populateDescriptorConverter(g *Generator, desc *Descriptor, thisConverter s
 	}
 	varName := CamelCase(strings.Join(desc.TypeName(), ""))
 
-	g.P("public static ", typeName, " to", funcName, "([]byte data) {")
+	g.P("public static ", typeName, " to", funcName, "(byte[] data) {")
 	g.In()
 	g.P("try {")
 	g.In()
@@ -183,7 +183,7 @@ func populatePbToBeanConverter(g *Generator, file *FileDescriptor, javaClsName s
 		g.P()
 	}
 
-	g.P("public static final ", javaClsName, " {")
+	g.P("public static final class ", javaClsName, " {")
 	g.In()
 
 	for _, desc := range file.desc {
