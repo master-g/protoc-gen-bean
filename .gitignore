@@ -21,3 +21,4 @@ test/com
 
 # Binary
 protoc-gen-bean
+bin/
