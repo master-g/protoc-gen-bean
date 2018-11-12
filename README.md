@@ -28,8 +28,8 @@ To pass extra parameters to the plugin, use a comma-separated parameter list sep
 
     protoc --plugin=protoc-gen-bean --bean_out=vopackage=vo,cvtpackage=protobuf.converter:. *.proto
     
-* `vopackage=xxx` - java value object package
-* `cvtpackage=xxx` - converter package
+* `vopkg=xxx` - java value object package
+* `cvtpkg=xxx` - converter package
 
 Consider file test.proto, containing
 
@@ -107,4 +107,3 @@ public class CommonPb2JavaBean {
                 └── common
                     └── Hello.java
 ```
-
