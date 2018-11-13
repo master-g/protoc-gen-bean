@@ -24,6 +24,3 @@
 
 # Executable
 bin/
-
-# Binary
-protoc-gen-bean
