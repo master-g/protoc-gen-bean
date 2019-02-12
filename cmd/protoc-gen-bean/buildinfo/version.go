@@ -45,7 +45,7 @@ type Version struct {
 var currentVersion = Version{
 	Major: 0,
 	Minor: 2,
-	Patch: 0,
+	Patch: 1,
 }
 
 // String interface
