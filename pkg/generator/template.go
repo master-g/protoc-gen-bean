@@ -154,15 +154,14 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 		switch field.GetType() {
 		case descriptor.FieldDescriptorProto_TYPE_BYTES:
 			sysImp["java.util.Arrays"] = field.GetName()
-		case descriptor.FieldDescriptorProto_TYPE_ENUM:
-			fallthrough
-		case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		default:
 			if isRepeated(field) {
 				sysImp["java.util.List"] = field.GetName()
 			}
 			obj, ok := g.typeNameToObject[field.GetTypeName()]
 			if !ok {
-				g.Fail("unable to find object with type named,", field.GetTypeName())
+				continue
+				// g.Fail("unable to find object with type named,", field.GetTypeName())
 			}
 			// .package.name.TypeName -> package.name.TypeName
 			typeName := field.GetTypeName()[1:]
@@ -171,7 +170,7 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 
 			// RootMsg.NestMsg -> RootMsg
 			importPkg := typeName
-			if strings.Index(typeName, ".") != -1 {
+			if strings.Contains(typeName, ".") {
 				importPkg = strings.Split(typeName, ".")[0]
 			}
 
