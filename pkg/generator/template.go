@@ -161,7 +161,7 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 		typeDesc = getFieldTypeName(g, field)
 		if isRepeated(field) {
-			typeDesc = fmt.Sprintf("Array<%s> = emptyArray()", typeDesc)
+			typeDesc = fmt.Sprintf("List<%s> = emptyList()", typeDesc)
 		} else {
 			typeDesc = fmt.Sprintf("%s? = null", typeDesc)
 		}
