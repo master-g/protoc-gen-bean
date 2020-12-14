@@ -31,7 +31,6 @@ type Generator struct {
 	Param map[string]string // Command-line parameters.
 
 	ValueObjectPackage string // Java value object output package
-	ConverterPackage   string // Java bean converter output package
 
 	allFiles         []*FileDescriptor          // All files in the tree
 	allFilesByName   map[string]*FileDescriptor // All files by input filename.
@@ -83,16 +82,11 @@ func (g *Generator) CommandLineParameters(parameter string) {
 		switch k {
 		case "vopkg":
 			g.ValueObjectPackage = paramToJavaPackage(v)
-		case "cvtpkg":
-			g.ConverterPackage = paramToJavaPackage(v)
 		}
 	}
 
 	if g.ValueObjectPackage == "" {
 		g.Fail("invalid vo package, use --bean_out=vopkg=[package.of.vo], to set")
-	}
-	if g.ConverterPackage == "" {
-		g.ConverterPackage = fmt.Sprintf("%s.%s", g.ValueObjectPackage, "converter")
 	}
 }
 
@@ -335,7 +329,6 @@ func (g *Generator) GenerateAllFiles() {
 			continue
 		}
 		g.generateBeans(file)
-		g.generateConverters(file)
 	}
 }
 
@@ -353,7 +346,7 @@ func (g *Generator) generateBeans(file *FileDescriptor) {
 		populateEnum(g, e)
 
 		fullPath := getFullPathComponents(g, file, e.TypeName())
-		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.java", e.GetName()))
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.kt", e.GetName()))
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(path.Join(fullPath...)),
 			Content: proto.String(g.String()),
@@ -371,26 +364,10 @@ func (g *Generator) generateBeans(file *FileDescriptor) {
 		populateDescriptor(g, d)
 
 		fullPath := getFullPathComponents(g, file, d.TypeName())
-		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.java", d.GetName()))
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.kt", d.GetName()))
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(path.Join(fullPath...)),
 			Content: proto.String(g.String()),
 		})
 	}
-}
-
-// Fill the response protocol buffer with the generated output for all the files we're
-// supposed to generate.
-func (g *Generator) generateConverters(file *FileDescriptor) {
-	g.file = file
-
-	javaClsName := javaConverterName(file)
-
-	pathComp := append(strings.Split(g.ConverterPackage, "."), fmt.Sprintf("%s.java", javaClsName))
-	g.Reset()
-	populatePbToBeanConverter(g, file, javaClsName)
-	g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
-		Name:    proto.String(path.Join(pathComp...)),
-		Content: proto.String(g.String()),
-	})
 }

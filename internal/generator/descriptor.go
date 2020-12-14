@@ -197,7 +197,7 @@ func (d *FileDescriptor) javaFileName(pathType pathType) string {
 	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
 		name = name[:len(name)-len(ext)]
 	}
-	name += ".java"
+	name += ".kt"
 
 	if pathType == pathTypeSourceRelative {
 		return name

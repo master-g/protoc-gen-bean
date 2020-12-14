@@ -31,7 +31,7 @@ func populateHeaderComment(g *Generator, f *FileDescriptor) {
 
 func populateEnum(g *Generator, enum *EnumDescriptor) {
 	if enum.parent == nil {
-		g.P("package ", enumPackagePath(g, enum), ";")
+		g.P("package ", enumPackagePath(g, enum))
 		populateHeaderComment(g, enum.File())
 	}
 
@@ -40,7 +40,7 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 	}
 
 	g.PrintComments(enum.path)
-	g.P("public enum ", enum.GetName(), " {")
+	g.P("enum class ", enum.GetName(), "(var code: Int) {")
 
 	// in order to add default value, need to iterate two rounds
 	addDefaultValue := true
@@ -49,7 +49,7 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 	defaultValue = -1
 	for _, e := range enum.Value {
 		low := strings.ToLower(e.GetName())
-		if addDefaultValue && // save some string comparision
+		if addDefaultValue && // save some string comparison
 			(strings.Contains(low, "default") ||
 				strings.Contains(low, "unknow") || // the missing 'n' is for poor spelling
 				strings.Contains(low, "invalid")) {
@@ -86,28 +86,19 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 		}
 	}
 	g.P()
-	g.P("public int code;")
+	g.P("companion object {")
 	g.P()
-	g.P(enum.GetName(), "(int code) { this.code = code; }")
-	g.P()
-	g.P("/**")
-	g.P(" * @deprecated Use {@link #forNumber(int)} instead.")
-	g.P(" */")
-	g.P("@java.lang.Deprecated")
-	g.P("public static ", enum.GetName(), " valueOf(int value) {")
 	g.In()
-	g.P("return forNumber(value);")
-	g.Out()
-	g.P("}")
-	g.P()
-	g.P("public static ", enum.GetName(), " forNumber(int value) {")
+	g.P("fun forNumber(value: Int): ", enum.GetName(), " {")
 	g.In()
-	g.P("switch (value) {")
+	g.P("return when (value) {")
 	g.In()
 	for _, e := range enum.Value {
-		g.P("case ", e.Number, ": return ", e.GetName(), ";")
+		g.P(e.Number, " -> ", e.GetName())
 	}
-	g.P("default: return ", defaultName, ";")
+	g.P("else -> ", defaultName)
+	g.Out()
+	g.P("}")
 	g.Out()
 	g.P("}")
 	g.Out()
@@ -136,20 +127,11 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 		extractImports(g, nested, sysImp, usrImp)
 	}
 
-	if len(msg.Field) != 0 {
-		sysImp["java.io.Serializable"] = msg.GetName()
-	}
-
 	for _, field := range msg.Field {
 		switch field.GetType() {
-		case descriptor.FieldDescriptorProto_TYPE_BYTES:
-			sysImp["java.util.Arrays"] = field.GetName()
 		case descriptor.FieldDescriptorProto_TYPE_ENUM:
 			fallthrough
 		case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-			if isRepeated(field) {
-				sysImp["java.util.List"] = field.GetName()
-			}
 			obj, ok := g.typeNameToObject[field.GetTypeName()]
 			if !ok {
 				g.Fail("unable to find object with type named,", field.GetTypeName())
@@ -179,7 +161,9 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 		typeDesc = getFieldTypeName(g, field)
 		if isRepeated(field) {
-			typeDesc = fmt.Sprintf("List<%s>", typeDesc)
+			typeDesc = fmt.Sprintf("Array<%s> = emptyArray()", typeDesc)
+		} else {
+			typeDesc = fmt.Sprintf("%s? = null", typeDesc)
 		}
 	default:
 		typeDesc = javaType(field)
@@ -196,12 +180,11 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 	} else {
 		tail = fmt.Sprintf(" %s", tail)
 	}
-	g.P("public ", typeDesc, " ", javaFieldName(field), ";", tail)
+	g.P("var ", javaFieldName(field), ": ", typeDesc, tail)
 }
 
 func populateToString(g *Generator, msg *Descriptor) {
-	g.P("@Override")
-	g.P("public String toString() {")
+	g.P("override fun toString(): String {")
 	g.In()
 	g.P("return \"", msg.GetName(), "{\" +")
 	g.In()
@@ -293,15 +276,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	}
 
 	g.PrintComments(msg.path)
-	serializable := " implements Serializable"
-	staticable := " static"
-	if len(msg.Field) == 0 {
-		serializable = ""
-	}
-	if msg.parent == nil {
-		staticable = ""
-	}
-	g.P("public", staticable, " final ", msg.GetName(), serializable, " {")
+	g.P("class ", msg.GetName(), " {")
 	g.In()
 	// fields
 	for i, field := range msg.Field {

@@ -134,15 +134,15 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 		if repeat {
-			return "List<Double>"
+			return "DoubleArray = doubleArrayOf()"
 		} else {
-			return "double"
+			return "Double = 0.0"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 		if repeat {
-			return "List<Float>"
+			return "FloatArray = floatArrayOf()"
 		} else {
-			return "float"
+			return "Float = 0f"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT64:
 		fallthrough
@@ -154,9 +154,9 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 		fallthrough
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
 		if repeat {
-			return "List<Long>"
+			return "LongArray = longArrayOf()"
 		} else {
-			return "long"
+			return "Long = 0L"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT32:
 		fallthrough
@@ -168,24 +168,24 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 		fallthrough
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		if repeat {
-			return "List<Integer>"
+			return "IntArray = intArrayOf()"
 		} else {
-			return "int"
+			return "Int = 0"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		if repeat {
-			return "List<Boolean>"
+			return "BooleanArray = booleanArrayOf()"
 		} else {
-			return "boolean"
+			return "Boolean = false"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		if repeat {
-			return "List<String>"
+			return "Array<String> = emptyArray()"
 		} else {
-			return "String"
+			return "String = \"\""
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return "byte[]"
+		return "ByteArray = byteArrayOf()"
 	default:
 		return ""
 	}
