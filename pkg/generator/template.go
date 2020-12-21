@@ -153,7 +153,7 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 	}
 }
 
-func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int) {
+func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int, total int) {
 	typeDesc := ""
 	switch field.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
@@ -170,6 +170,10 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 		if typeDesc == "" {
 			g.Fail("unknown type for", field.GetName())
 		}
+	}
+
+	if total > 1 && index < total-1 {
+		typeDesc = fmt.Sprintf("%s,", typeDesc)
 	}
 
 	ftorPath := fmt.Sprintf("%s,%d,%d", msg.path, messageFieldPath, index)
@@ -276,25 +280,28 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	}
 
 	g.PrintComments(msg.path)
-	g.P("class ", msg.GetName(), " {")
+	g.P("data class ", msg.GetName(), "(")
 	g.In()
 	// fields
 	for i, field := range msg.Field {
-		populateField(g, msg, field, i)
+		populateField(g, msg, field, i, len(msg.Field))
 	}
+	g.Out()
+	g.P(") {")
+	g.In()
 
 	// nested enums
 	for _, nestEnum := range msg.enums {
-		g.P()
 		populateEnum(g, nestEnum)
+		g.P()
 	}
 
 	// nested descriptors
 	for _, nestDesc := range msg.nested {
-		g.P()
 		populateDescriptor(g, nestDesc)
+		g.P()
 	}
-	g.P()
+
 	if len(msg.Field) > 0 {
 		populateToString(g, msg)
 	}
