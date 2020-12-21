@@ -216,11 +216,11 @@ func populateToString(g *Generator, msg *Descriptor) {
 			sb.WriteString(" + '\\''")
 		}
 
-		sb.WriteString(" + ")
+		sb.WriteString(" +")
 
 		g.P(sb.String())
 	}
-	g.P("\"}\";")
+	g.P("\"}\"")
 	g.Out()
 	g.Out()
 	g.Out()
