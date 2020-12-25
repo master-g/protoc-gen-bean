@@ -62,7 +62,6 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 		}
 	}
 
-	g.P()
 	g.In()
 
 	if addDefaultValue {
@@ -87,7 +86,6 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 	}
 	g.P()
 	g.P("companion object {")
-	g.P()
 	g.In()
 	g.P("fun forNumber(value: Int): ", enum.GetName(), " {")
 	g.In()
@@ -153,7 +151,7 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 	}
 }
 
-func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int, total int) {
+func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int) {
 	typeDesc := ""
 	switch field.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
@@ -170,10 +168,6 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 		if typeDesc == "" {
 			g.Fail("unknown type for", field.GetName())
 		}
-	}
-
-	if total > 1 && index < total-1 {
-		typeDesc = fmt.Sprintf("%s,", typeDesc)
 	}
 
 	ftorPath := fmt.Sprintf("%s,%d,%d", msg.path, messageFieldPath, index)
@@ -211,7 +205,7 @@ func populateToString(g *Generator, msg *Descriptor) {
 		sb.WriteString("\" + ")
 
 		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES {
-			sb.WriteString(fmt.Sprintf("Arrays.toString(%s)", name))
+			sb.WriteString(fmt.Sprintf("%s.size + \"bytes\"", name))
 		} else {
 			sb.WriteString(name)
 		}
@@ -280,29 +274,33 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	}
 
 	g.PrintComments(msg.path)
-	g.P("data class ", msg.GetName(), "(")
+	g.P("class ", msg.GetName(), " {")
 	g.In()
 	// fields
 	for i, field := range msg.Field {
-		populateField(g, msg, field, i, len(msg.Field))
+		populateField(g, msg, field, i)
 	}
 	g.Out()
-	g.P(") {")
-	g.In()
 
 	// nested enums
 	for _, nestEnum := range msg.enums {
-		populateEnum(g, nestEnum)
 		g.P()
+		g.In()
+		populateEnum(g, nestEnum)
+		g.Out()
 	}
 
 	// nested descriptors
 	for _, nestDesc := range msg.nested {
-		populateDescriptor(g, nestDesc)
 		g.P()
+		g.In()
+		populateDescriptor(g, nestDesc)
+		g.Out()
 	}
 
 	if len(msg.Field) > 0 {
+		g.P()
+		g.In()
 		populateToString(g, msg)
 	}
 
