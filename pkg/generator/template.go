@@ -213,6 +213,8 @@ func populateToString(g *Generator, msg *Descriptor) {
 			if !repeat {
 				sb.WriteString(" + '\\''")
 			}
+		case descriptor.FieldDescriptorProto_TYPE_ENUM:
+			sb.WriteString(name)
 		case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 			sb.WriteString(name)
 		default:
