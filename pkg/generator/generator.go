@@ -213,27 +213,27 @@ func (g *Generator) BuildTypeNameMap() {
 func (g *Generator) printAtom(v interface{}) {
 	switch v := v.(type) {
 	case string:
-		g.WriteString(v)
+		_, _ = g.WriteString(v)
 	case *string:
-		g.WriteString(*v)
+		_, _ = g.WriteString(*v)
 	case bool:
-		fmt.Fprint(g, v)
+		_, _ = fmt.Fprint(g, v)
 	case *bool:
-		fmt.Fprint(g, *v)
+		_, _ = fmt.Fprint(g, *v)
 	case int:
-		fmt.Fprint(g, v)
+		_, _ = fmt.Fprint(g, v)
 	case *int32:
-		fmt.Fprint(g, *v)
+		_, _ = fmt.Fprint(g, *v)
 	case *int64:
-		fmt.Fprint(g, *v)
+		_, _ = fmt.Fprint(g, *v)
 	case float64:
-		fmt.Fprint(g, v)
+		_, _ = fmt.Fprint(g, v)
 	case *float64:
-		fmt.Fprint(g, *v)
+		_, _ = fmt.Fprint(g, *v)
 	case JavaPackageName:
-		g.WriteString(string(v))
+		_, _ = g.WriteString(string(v))
 	case JavaImportPath:
-		g.WriteString(strconv.Quote(string(v)))
+		_, _ = g.WriteString(strconv.Quote(string(v)))
 	default:
 		g.Fail(fmt.Sprintf("unknown type in printer: %T", v))
 	}
@@ -247,17 +247,17 @@ func (g *Generator) P(str ...interface{}) {
 	if !g.writeOutput {
 		return
 	}
-	g.WriteString(g.indent)
+	_, _ = g.WriteString(g.indent)
 	for _, v := range str {
 		g.printAtom(v)
 	}
-	g.WriteByte('\n')
+	_ = g.WriteByte('\n')
 }
 
 // In Indents the output one tab stop.
 func (g *Generator) In() { g.indent += DefaultIndent }
 
-// Out unindents the output one tab stop.
+// Out outdents the output one tab stop.
 func (g *Generator) Out() {
 	if len(g.indent) > 0 {
 		g.indent = g.indent[len(DefaultIndent):]
@@ -291,7 +291,7 @@ func (g *Generator) makeComments(path string) (string, bool) {
 	w := new(bytes.Buffer)
 	nl := ""
 	for _, line := range strings.Split(strings.TrimSuffix(loc.GetLeadingComments(), "\n"), "\n") {
-		fmt.Fprintf(w, "%s//%s", nl, line)
+		_, _ = fmt.Fprintf(w, "%s//%s", nl, line)
 		nl = "\n"
 	}
 	return w.String(), true
@@ -308,7 +308,7 @@ func (g *Generator) tailingComments(path string) (string, bool) {
 	w := new(bytes.Buffer)
 	nl := ""
 	for _, line := range strings.Split(strings.TrimSuffix(loc.GetTrailingComments(), "\n"), "\n") {
-		fmt.Fprintf(w, "%s//%s", nl, line)
+		_, _ = fmt.Fprintf(w, "%s//%s", nl, line)
 		nl = "\n"
 	}
 	return w.String(), true

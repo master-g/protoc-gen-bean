@@ -190,6 +190,7 @@ func populateToString(g *Generator, msg *Descriptor) {
 	sb := &strings.Builder{}
 	for i, field := range msg.Field {
 		name := javaFieldName(field)
+		repeat := isRepeated(field)
 
 		sb.Reset()
 		sb.WriteByte('"')
@@ -198,20 +199,28 @@ func populateToString(g *Generator, msg *Descriptor) {
 		}
 		sb.WriteString(name)
 		sb.WriteByte('=')
-		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING {
+		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING && !repeat {
 			sb.WriteByte('\'')
 		}
 
 		sb.WriteString("\" + ")
 
-		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_BYTES {
+		switch field.GetType() {
+		case descriptor.FieldDescriptorProto_TYPE_BYTES:
 			sb.WriteString(fmt.Sprintf("%s.size + \"bytes\"", name))
-		} else {
+		case descriptor.FieldDescriptorProto_TYPE_STRING:
 			sb.WriteString(name)
-		}
-
-		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING {
-			sb.WriteString(" + '\\''")
+			if !repeat {
+				sb.WriteString(" + '\\''")
+			}
+		case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+			sb.WriteString(name)
+		default:
+			if repeat {
+				sb.WriteString(fmt.Sprintf("%s.contentToString()", name))
+			} else {
+				sb.WriteString(name)
+			}
 		}
 
 		sb.WriteString(" +")
@@ -230,7 +239,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	if msg.parent == nil {
 		// only root messages have these fancy stuff
 		thisPackage := descriptorPackagePath(g, msg)
-		g.P("package ", thisPackage, ";")
+		g.P("package ", thisPackage)
 		populateHeaderComment(g, msg.File())
 
 		// imports
@@ -247,7 +256,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 			addParagraph := false
 			for _, p := range usrImpKeys {
 				if !strings.HasPrefix(p, thisPackage) {
-					g.P("import ", p, ";")
+					g.P("import ", p)
 					addParagraph = true
 				}
 			}
@@ -263,7 +272,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 			}
 			sort.Strings(sysImpKeys)
 			for _, p := range sysImpKeys {
-				g.P("import ", p, ";")
+				g.P("import ", p)
 			}
 			g.P()
 		}

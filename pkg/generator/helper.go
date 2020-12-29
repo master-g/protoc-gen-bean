@@ -180,7 +180,7 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 		}
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		if repeat {
-			return "Array<String> = emptyArray()"
+			return "List<String> = listOf()"
 		} else {
 			return "String = \"\""
 		}
