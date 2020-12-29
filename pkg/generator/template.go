@@ -207,7 +207,7 @@ func populateToString(g *Generator, msg *Descriptor) {
 
 		switch field.GetType() {
 		case descriptor.FieldDescriptorProto_TYPE_BYTES:
-			sb.WriteString(fmt.Sprintf("%s.size + \"bytes\"", name))
+			sb.WriteString(fmt.Sprintf("%s.size + \" bytes\"", name))
 		case descriptor.FieldDescriptorProto_TYPE_STRING:
 			sb.WriteString(name)
 			if !repeat {
