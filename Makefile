@@ -26,7 +26,7 @@ BIN := $(shell pwd)/bin
 .PHONY: mod
 mod:
 	@echo "  >  Reset go mod..."
-	@rm go.mod go.sum
+	@rm -f go.mod go.sum
 	@go mod init $(GOMODULE)
 
 
