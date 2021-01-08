@@ -154,6 +154,15 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int) {
 	typeName := ""
 	typeDefaultValue := ""
+
+	oneof := field.OneofIndex != nil
+	if oneof {
+		odp := msg.OneofDecl[int(*field.OneofIndex)]
+		base := fmt.Sprintf("Oneof%s", strings.Title(CamelCase(odp.GetName())))
+		g.P("// TODO: oneof: ", base, " -> ", field.GetName())
+		return
+	}
+
 	switch field.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
 		fallthrough
