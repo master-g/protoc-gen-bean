@@ -209,6 +209,16 @@ func (g *Generator) BuildTypeNameMap() {
 	}
 }
 
+// ObjectNamed, given fully-qualified input type name as it appears in the input data,
+// returns the descriptor for the message or enum with that name
+func (g *Generator) ObjectNamed(typeName string) Object {
+	o, ok := g.typeNameToObject[typeName]
+	if !ok {
+		g.Fail("can't find object with type", typeName)
+	}
+	return o
+}
+
 // printAtom prints the (atomic, non-annotation) argument to the generated output.
 func (g *Generator) printAtom(v interface{}) {
 	switch v := v.(type) {

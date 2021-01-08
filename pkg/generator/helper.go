@@ -129,20 +129,24 @@ func paramToJavaPackage(param string) string {
 }
 
 // javaType returns a string representing the type name, and the wire type
-func javaType(field *descriptor.FieldDescriptorProto) string {
+func javaType(field *descriptor.FieldDescriptorProto) (typeName, defaultValue string) {
 	repeat := isRepeated(field)
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 		if repeat {
-			return "DoubleArray = doubleArrayOf()"
+			typeName = "DoubleArray"
+			defaultValue = "doubleArrayOf()"
 		} else {
-			return "Double = 0.0"
+			typeName = "Double"
+			defaultValue = "0.0"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 		if repeat {
-			return "FloatArray = floatArrayOf()"
+			typeName = "FloatArray"
+			defaultValue = "floatArrayOf()"
 		} else {
-			return "Float = 0f"
+			typeName = "Float"
+			defaultValue = "0f"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT64:
 		fallthrough
@@ -154,9 +158,11 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 		fallthrough
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
 		if repeat {
-			return "LongArray = longArrayOf()"
+			typeName = "LongArray"
+			defaultValue = "longArrayOf()"
 		} else {
-			return "Long = 0L"
+			typeName = "Long"
+			defaultValue = "0L"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_INT32:
 		fallthrough
@@ -168,27 +174,34 @@ func javaType(field *descriptor.FieldDescriptorProto) string {
 		fallthrough
 	case descriptor.FieldDescriptorProto_TYPE_SINT32:
 		if repeat {
-			return "IntArray = intArrayOf()"
+			typeName = "IntArray"
+			defaultValue = "intArrayOf()"
 		} else {
-			return "Int = 0"
+			typeName = "Int"
+			defaultValue = "0"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
 		if repeat {
-			return "BooleanArray = booleanArrayOf()"
+			typeName = "BooleanArray"
+			defaultValue = "booleanArrayOf()"
 		} else {
-			return "Boolean = false"
+			typeName = "Boolean"
+			defaultValue = "false"
 		}
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
 		if repeat {
-			return "List<String> = listOf()"
+			typeName = "List<String>"
+			defaultValue = "listOf()"
 		} else {
-			return "String = \"\""
+			typeName = "String"
+			defaultValue = "\"\""
 		}
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return "ByteArray = byteArrayOf()"
-	default:
-		return ""
+		typeName = "ByteArray"
+		defaultValue = "byteArrayOf()"
 	}
+
+	return
 }
 
 func javaFieldName(field *descriptor.FieldDescriptorProto) string {

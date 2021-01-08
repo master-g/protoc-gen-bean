@@ -152,20 +152,30 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 }
 
 func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int) {
-	typeDesc := ""
+	typeName := ""
+	typeDefaultValue := ""
 	switch field.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
 		fallthrough
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		typeDesc = getFieldTypeName(g, field)
-		if isRepeated(field) {
-			typeDesc = fmt.Sprintf("List<%s> = emptyList()", typeDesc)
+		desc := g.ObjectNamed(field.GetTypeName())
+		if d, ok := desc.(*Descriptor); ok && d.GetOptions().GetMapEntry() {
+			// Figure out the kotlin types and tags for the key and value type
+			keyField, valField := d.Field[0], d.Field[1]
+			typeName, typeDefaultValue = populateMap(g, keyField, valField)
 		} else {
-			typeDesc = fmt.Sprintf("%s? = null", typeDesc)
+			typeName = getFieldTypeName(g, field)
+			if isRepeated(field) {
+				typeName = fmt.Sprintf("List<%s>", typeName)
+				typeDefaultValue = "emptyList()"
+			} else {
+				typeName = fmt.Sprintf("%s?", typeName)
+				typeDefaultValue = "null"
+			}
 		}
 	default:
-		typeDesc = javaType(field)
-		if typeDesc == "" {
+		typeName, typeDefaultValue = javaType(field)
+		if typeName == "" {
 			g.Fail("unknown type for", field.GetName())
 		}
 	}
@@ -178,7 +188,34 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 	} else {
 		tail = fmt.Sprintf(" %s", tail)
 	}
-	g.P("var ", javaFieldName(field), ": ", typeDesc, tail)
+	g.P("var ", javaFieldName(field), ": ", typeName, " = ", typeDefaultValue, tail)
+}
+
+func populateMap(g *Generator, keyField, valField *descriptor.FieldDescriptorProto) (typeName, typeDefaultValue string) {
+	var keyTypeName string
+	switch keyField.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_ENUM:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		keyTypeName = getFieldTypeName(g, keyField)
+	default:
+		keyTypeName, _ = javaType(keyField)
+	}
+
+	var valTypeName string
+	switch valField.GetType() {
+	case descriptor.FieldDescriptorProto_TYPE_ENUM:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
+		valTypeName = getFieldTypeName(g, valField)
+	default:
+		valTypeName, _ = javaType(valField)
+	}
+
+	typeName = fmt.Sprintf("Map<%s, %s>", keyTypeName, valTypeName)
+	typeDefaultValue = "mapOf()"
+
+	return
 }
 
 func populateToString(g *Generator, msg *Descriptor) {
@@ -312,6 +349,10 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 
 	// nested descriptors
 	for _, nestDesc := range msg.nested {
+		if nestDesc.GetOptions().GetMapEntry() {
+			// Don't generate virtual messages for maps.
+			continue
+		}
 		g.P()
 		g.In()
 		populateDescriptor(g, nestDesc)
