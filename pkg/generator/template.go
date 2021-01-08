@@ -236,6 +236,15 @@ func populateToString(g *Generator, msg *Descriptor) {
 	g.P("}")
 }
 
+func underSamePackage(importTypeFullpath, myPackage string) bool {
+	importComponents := strings.Split(importTypeFullpath, ".")
+	if len(importComponents) > 1 {
+		importComponents = importComponents[:len(importComponents)-1]
+	}
+	importPackage := strings.Join(importComponents, ".")
+	return strings.Compare(importPackage, myPackage) == 0
+}
+
 func populateDescriptor(g *Generator, msg *Descriptor) {
 	// only root messages have package announcement, header and imports
 	if msg.parent == nil {
@@ -257,7 +266,7 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 			sort.Strings(usrImpKeys)
 			addParagraph := false
 			for _, p := range usrImpKeys {
-				if !strings.HasPrefix(p, thisPackage) {
+				if !underSamePackage(p, thisPackage) {
 					g.P("import ", p)
 					addParagraph = true
 				}
