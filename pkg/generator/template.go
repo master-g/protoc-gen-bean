@@ -92,7 +92,7 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 	g.P("return when (value) {")
 	g.In()
 	for _, e := range enum.Value {
-		g.P(e.Number, " -> ", e.GetName())
+		g.P(e.GetName(), ".code -> ", e.GetName())
 	}
 	g.P("else -> ", defaultName)
 	g.Out()
