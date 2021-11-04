@@ -83,6 +83,14 @@ release:
 	-output="release/{{.OS}}_{{.Arch}}/{{.Dir}}" ./cmd/protoc-gen-bean
 
 
+.PHONY: dist
+dist:
+	@echo "  > Distributing..."
+	@tar czf ./release/linux_amd64.tar.gz -C ./release/linux_amd64 .
+	@zip -r ./release/darwin_amd64.zip ./release/darwin_amd64
+	@zip -r ./release/windows_amd64.zip ./release/windows_amd64
+
+
 .PHONY: help
 all: help
 help: Makefile
