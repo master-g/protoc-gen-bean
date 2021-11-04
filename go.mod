@@ -1,5 +1,7 @@
 module github.com/master-g/protoc-gen-bean
 
-go 1.15
+go 1.17
 
-require github.com/golang/protobuf v1.4.3
+require github.com/golang/protobuf v1.5.2
+
+require google.golang.org/protobuf v1.26.0 // indirect

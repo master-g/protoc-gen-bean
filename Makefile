@@ -11,7 +11,7 @@ GOFILES := $(wildcard *.go)
 GOMODULE := github.com/master-g/protoc-gen-bean
 
 GOLANGCILINT := $(GOBIN)/golangci-lint
-GOLANGCILINT_VER := v1.33.0
+GOLANGCILINT_VER := v1.43.0
 
 # output
 BIN := $(shell pwd)/bin

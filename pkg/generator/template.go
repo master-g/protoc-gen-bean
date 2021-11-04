@@ -84,7 +84,7 @@ func populateEnum(g *Generator, enum *EnumDescriptor) {
 			g.P(e.GetName(), "(", e.Number, "),", tails)
 		}
 	}
-	g.P()
+	g.Newline()
 	g.P("companion object {")
 	g.In()
 	g.P("fun forNumber(value: Int): ", enum.GetName(), " {")
@@ -141,7 +141,7 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 
 			// RootMsg.NestMsg -> RootMsg
 			importPkg := typeName
-			if strings.Index(typeName, ".") != -1 {
+			if strings.Contains(typeName, ".") {
 				importPkg = strings.Split(typeName, ".")[0]
 			}
 
@@ -154,14 +154,6 @@ func extractImports(g *Generator, msg *Descriptor, sysImp, usrImp map[string]str
 func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescriptorProto, index int) {
 	typeName := ""
 	typeDefaultValue := ""
-
-	oneof := field.OneofIndex != nil
-	if oneof {
-		odp := msg.OneofDecl[int(*field.OneofIndex)]
-		base := fmt.Sprintf("Oneof%s", strings.Title(CamelCase(odp.GetName())))
-		g.P("// TODO: oneof: ", base, " -> ", field.GetName())
-		return
-	}
 
 	switch field.GetType() {
 	case descriptor.FieldDescriptorProto_TYPE_ENUM:
@@ -189,8 +181,20 @@ func populateField(g *Generator, msg *Descriptor, field *descriptor.FieldDescrip
 		}
 	}
 
+	if field.OneofIndex != nil {
+		// oneof
+		if !strings.HasSuffix(typeName, "?") {
+			typeName = fmt.Sprintf("%v?", typeName)
+		}
+		typeDefaultValue = "null"
+	}
+
 	ftorPath := fmt.Sprintf("%s,%d,%d", msg.path, messageFieldPath, index)
-	g.PrintComments(ftorPath)
+	if c, ok := g.makeComments(ftorPath); ok {
+		g.Newline()
+		g.P(c)
+	}
+	//g.PrintComments(ftorPath)
 	tail, ok := g.tailingComments(ftorPath)
 	if !ok {
 		tail = ""
@@ -233,7 +237,9 @@ func populateToString(g *Generator, msg *Descriptor) {
 	g.P("return \"", msg.GetName(), "{\" +")
 	g.In()
 	g.In()
+
 	sb := &strings.Builder{}
+
 	for i, field := range msg.Field {
 		name := javaFieldName(field)
 		repeat := isRepeated(field)
@@ -243,7 +249,9 @@ func populateToString(g *Generator, msg *Descriptor) {
 		if i != 0 {
 			sb.WriteString(", ")
 		}
+
 		sb.WriteString(name)
+
 		sb.WriteByte('=')
 		if field.GetType() == descriptor.FieldDescriptorProto_TYPE_STRING && !repeat {
 			sb.WriteByte('\'')
@@ -342,11 +350,49 @@ func populateDescriptor(g *Generator, msg *Descriptor) {
 	g.PrintComments(msg.path)
 	g.P("class ", msg.GetName(), " {")
 	g.In()
+
 	// fields
+	oFields := make(map[int32]*oneofField)
+
 	for i, field := range msg.Field {
+		oneof := field.OneofIndex != nil
+		if oneof && oFields[*field.OneofIndex] == nil {
+			odp := msg.OneofDecl[int(*field.OneofIndex)]
+
+			of := oneofField{
+				name:      CamelCase(odp.GetName()),
+				field:     field,
+				subFields: nil,
+			}
+
+			oFields[*field.OneofIndex] = &of
+		}
+
+		if oneof {
+			sf := oneofSubField{
+				index: i,
+				field: field,
+			}
+
+			of := oFields[*field.OneofIndex]
+			if of != nil {
+				of.subFields = append(of.subFields, &sf)
+			}
+		}
+
 		populateField(g, msg, field, i)
 	}
 	g.Out()
+
+	// oneof
+	for _, of := range oFields {
+		g.P()
+		g.In()
+
+		of.populate(g, msg)
+
+		g.Out()
+	}
 
 	// nested enums
 	for _, nestEnum := range msg.enums {

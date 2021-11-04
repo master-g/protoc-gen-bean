@@ -264,6 +264,13 @@ func (g *Generator) P(str ...interface{}) {
 	_ = g.WriteByte('\n')
 }
 
+func (g *Generator) Newline() {
+	if !g.writeOutput {
+		return
+	}
+	_ = g.WriteByte('\n')
+}
+
 // In Indents the output one tab stop.
 func (g *Generator) In() { g.indent += DefaultIndent }
 
