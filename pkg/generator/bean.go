@@ -12,9 +12,9 @@ func getFullPathComponents(g *Generator, f *FileDescriptor, typeName []string) [
 	if g.ValueObjectPackage != "" {
 		p = append(p, strings.Split(g.ValueObjectPackage, ".")...)
 	}
-	if f != nil && f.GetPackage() != "" {
-		p = append(p, strings.Split(f.GetPackage(), ".")...)
-	}
+	// if f != nil && f.GetPackage() != "" {
+	// 	p = append(p, strings.Split(f.GetPackage(), ".")...)
+	// }
 	p = append(p, typeName...)
 
 	return p

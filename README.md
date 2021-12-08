@@ -26,10 +26,10 @@ After install protocol buffer compiler, you can build protoc-gen-bean or downloa
 
 To pass extra parameters to the plugin, use a comma-separated parameter list separated from the output directory by a colon:
 
-    protoc --plugin=protoc-gen-bean --bean_out=vopackage=vo,cvtpackage=protobuf.converter:. *.proto
+    protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,cvtpkg=protobuf.converter:. *.proto
     
-* `vopackage=xxx` - java value object package
-* `cvtpackage=xxx` - converter package
+* `vopkg=xxx` - java value object package
+* `cvtpkg=xxx` - converter package
 
 Consider file test.proto, containing
 
@@ -58,8 +58,8 @@ public class Hello {
     @Override
     public String toString() {
         return "Hello{" +
-                "msg='" + msg + '\'' + ","
-                "code=" + code + "}"
+                "msg='" + msg + '\'' + "," +
+                "code=" + code + "}";
     }
 }
 ```
@@ -107,4 +107,3 @@ public class CommonPb2JavaBean {
                 └── common
                     └── Hello.java
 ```
-

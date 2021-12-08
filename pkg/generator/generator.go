@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/proto"
-
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
 )
 
@@ -104,10 +103,14 @@ func (g *Generator) WrapTypes() {
 		}
 
 		// import path of this file
-		fd.importPath = JavaImportPath(strings.Join([]string{
-			g.ValueObjectPackage,
-			strings.ToLower(f.GetPackage()),
-		}, "."))
+		if g.ValueObjectPackage != "" {
+			fd.importPath = JavaImportPath(g.ValueObjectPackage)
+		} else {
+			fd.importPath = JavaImportPath(strings.Join([]string{
+				g.ValueObjectPackage,
+				strings.ToLower(f.GetPackage()),
+			}, "."))
+		}
 
 		// We must wrap the descriptors before we wrap the enums
 		fd.desc = wrapDescriptors(fd)
