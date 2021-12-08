@@ -2,23 +2,23 @@
 
 # protoc-gen-bean
 
-中文说明文档在这里 [README](./README_CN.md)
+English version README [here](./README.md)
 
 Java Value Object Generator Plugin For Protobuf
 
-## Requirement
+## 安装要求
 
-Download and install the protocol buffer compiler.
+首先安装 protoc 编译工具
 
-you can find it here
+你可以在这里找到
 
 [Github](https://github.com/google/protobuf)
 
-or here
+或是从官网上下载
 
 [Google](https://developers.google.com/protocol-buffers/)
 
-## Installation
+## 安装
 
 ### Homebrew
 
@@ -27,32 +27,33 @@ brew tap master-g/tap
 brew install master-g/tap/protoc-gen-bean
 ```
 
-### Manually
+### 手动
 
-After install protocol buffer compiler, you can build protoc-gen-bean or download pre-built binary from [release](https://github.com/master-g/protoc-gen-bean/releases) page
+你可以克隆本代码仓库自行构建，或是移步 [release](https://github.com/master-g/protoc-gen-bean/releases) 页面下载预先编译好的二进制文件
 
-## Usage
+## 使用
 
 ```shell
 protoc --plugin=protoc-gen-bean --bean_out=. *.proto
 ```
 
-if you install via homebrew or had `protoc-gen-bean` added to your env PATH
+如果你是通过 homebrew 安装的，或是将 `protoc-gen-bean` 添加到了你的环境变量中(env PATH)，则：
 
 ```shell
 protoc --plugin=bean --bean_out=. *.proto
 ```
 
-### Parameters
+### 参数
 
-To pass extra parameters to the plugin, use a comma-separated parameter list separated from the output directory by a colon:
+为了向插件传递额外的参数，使用 `;` 来分离它们：
 
-    protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,cvtpkg=protobuf.converter:. *.proto
+```shell
+protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,cvtpkg=protobuf.converter:. *.proto
+```
 
-* `vopkg=xxx` - java value object package
-* `cvtpkg=xxx` - converter package
+* `vopkg=xxx` - Value Object 的包名
 
-Consider file test.proto, containing
+假设有 proto 文件 `test.proto` 内容如下：
 
 ```proto
 syntax = "proto3";
@@ -66,7 +67,7 @@ message Hello {
 }
 ```
 
-To create and play with a Test object from the example package,
+生成的例子代码如下
 
 **Java Value Object**
 
@@ -93,7 +94,7 @@ class Hello {
 }
 ```
 
-**Output Package Structure**
+**输出结构**
 
 ```
 .
