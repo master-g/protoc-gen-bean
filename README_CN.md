@@ -45,7 +45,7 @@ protoc --plugin=bean --bean_out=. *.proto
 
 ### 参数
 
-为了向插件传递额外的参数，使用 `;` 来分离它们：
+为了向插件传递额外的参数，使用 `,` 来分离它们：
 
 ```shell
 protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,cvtpkg=protobuf.converter:. *.proto
