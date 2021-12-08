@@ -1,0 +1,49 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+    # you may remove this if you don't need go generate
+    # - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=0
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - "-s -w"
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/protoc-gen-bean
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+  algorithm: sha256
+release:
+  draft: false
+changelog:
+  skip: true
+brews:
+  - tap:
+      owner: master-g
+      name: homebrew-tap
+    folder: Formula
+    homepage: "https://github.com/master-g/protoc-gen-bean"
+    description: Java Value Object Generator Plugin For Protobuf
+    license: Apache License
+    test: |
+      system "#{bin}/protoc-gen-bean -h"
+    install: |-
+      bin.install "protoc-gen-bean"

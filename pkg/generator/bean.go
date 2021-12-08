@@ -96,7 +96,8 @@ func (f *oneofField) populate(g *Generator, d *Descriptor) {
 	for _, sf := range f.subFields {
 		g.P(sf.getEnumName(), ".code -> ", sf.getEnumName())
 	}
-	g.P("else -> ", strings.ToUpper(f.name), "_NOT_SET")
+	notSet := fmt.Sprintf("%v_%v", strings.ToUpper(f.name), "NOT_SET")
+	g.P("else -> ", notSet)
 	g.Out()
 	g.P("}")
 	g.Out()
@@ -107,5 +108,5 @@ func (f *oneofField) populate(g *Generator, d *Descriptor) {
 	g.Out()
 	g.P("}")
 	g.Newline()
-	g.P("var ", f.name, "Case: ", f.getCaseClassName(), " = ", f.getCaseClassName(), ".NOT_SET")
+	g.P("var ", f.name, "Case: ", f.getCaseClassName(), " = ", f.getCaseClassName(), ".", notSet)
 }

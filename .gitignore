@@ -25,3 +25,4 @@
 # Executable
 bin/
 release/
+dist/
