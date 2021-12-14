@@ -30,6 +30,7 @@ type Generator struct {
 	Param map[string]string // Command-line parameters.
 
 	ValueObjectPackage string // Java value object output package
+	NoTime             bool   // DO NOT generate timestamp in header
 
 	allFiles         []*FileDescriptor          // All files in the tree
 	allFilesByName   map[string]*FileDescriptor // All files by input filename.
@@ -81,6 +82,8 @@ func (g *Generator) CommandLineParameters(parameter string) {
 		switch k {
 		case "vopkg":
 			g.ValueObjectPackage = paramToJavaPackage(v)
+		case "notime":
+			g.NoTime = strings.EqualFold(v, "true")
 		}
 	}
 
