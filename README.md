@@ -47,10 +47,10 @@ protoc --plugin=bean --bean_out=. *.proto
 
 To pass extra parameters to the plugin, use a comma-separated parameter list separated from the output directory by a colon:
 
-    protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,cvtpkg=protobuf.converter:. *.proto
+    protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,notime=false:. *.proto
 
 * `vopkg=xxx` - java value object package
-* `cvtpkg=xxx` - converter package
+* `notime=true|false` - generate timestamp to file header
 
 Consider file test.proto, containing
 
