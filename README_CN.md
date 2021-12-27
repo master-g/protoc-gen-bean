@@ -48,11 +48,12 @@ protoc --plugin=bean --bean_out=. *.proto
 为了向插件传递额外的参数，使用 `,` 来分离它们：
 
 ```shell
-protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,notime=false:. *.proto
+protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,notime=false,flavor=kotlin:. *.proto
 ```
 
 * `vopkg=xxx` - Value Object 的包名
 * `notime=true|false` - 是否禁止在生成文件的头部添加时间戳信息, 默认为生成 (false)
+* `flavor=kotlin|java` - 生成代码的风味, 默认为 kotlin (我们可能会停止维护 java 输出)
 
 假设有 proto 文件 `test.proto` 内容如下：
 

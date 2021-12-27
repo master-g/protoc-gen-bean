@@ -47,10 +47,13 @@ protoc --plugin=bean --bean_out=. *.proto
 
 To pass extra parameters to the plugin, use a comma-separated parameter list separated from the output directory by a colon:
 
-    protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,notime=false:. *.proto
+```shell
+protoc --plugin=protoc-gen-bean --bean_out=vopkg=vo,notime=false,flavor=kotlin:. *.proto
+```
 
 * `vopkg=xxx` - java value object package
 * `notime=true|false` - generate timestamp to file header
+* `flavor=kotlin|java` - generate source code flavor, default is kotlin (we might deprecate java output in the future)
 
 Consider file test.proto, containing
 
