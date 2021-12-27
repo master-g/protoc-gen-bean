@@ -75,6 +75,60 @@ func (f *oneofField) getCaseClassName() string {
 }
 
 func (f *oneofField) populate(g *Generator, d *Descriptor) {
+	if g.flavor == FlavorJava {
+		f.populateJava(g, d)
+	} else {
+		f.populateKotlin(g, d)
+	}
+}
+
+func (f *oneofField) populateJava(g *Generator, d *Descriptor) {
+	if len(f.subFields) == 0 {
+		return
+	}
+
+	g.P("public enum ", f.getCaseClassName(), " {")
+	g.In()
+	for _, sf := range f.subFields {
+		g.P(sf.getEnumName(), "(", sf.field.Number, "),")
+	}
+	g.P(strings.ToUpper(f.name), "_NOT_SET(0);")
+	// companion
+	g.Newline()
+	g.P("public int code;")
+	g.Newline()
+	g.P(f.getCaseClassName(), "(int code) {")
+	g.In()
+	g.P("this.code = code;")
+	g.Out()
+	g.P("}")
+	g.Newline()
+	g.P("public static ", f.getCaseClassName(), " forNumber(int value) {")
+	g.In()
+	g.P("switch (value) {")
+	g.In()
+	for _, sf := range f.subFields {
+		g.P("case ", sf.field.Number, ":")
+		g.In()
+		g.P("return ", sf.getEnumName(), ";")
+		g.Out()
+	}
+	notSet := fmt.Sprintf("%v_%v", strings.ToUpper(f.name), "NOT_SET")
+	g.P("default:")
+	g.In()
+	g.P("return ", notSet, ";")
+	g.Out()
+	g.Out()
+	g.P("}")
+	g.Out()
+	g.P("}")
+	g.Out()
+	g.P("}")
+	g.P()
+	g.P("public ", f.getCaseClassName(), " ", f.name, "Case", " = ", f.getCaseClassName(), ".", notSet, ";")
+}
+
+func (f *oneofField) populateKotlin(g *Generator, d *Descriptor) {
 	if len(f.subFields) == 0 {
 		return
 	}

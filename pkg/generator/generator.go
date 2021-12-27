@@ -20,6 +20,11 @@ const (
 	DefaultIndent = "    "
 )
 
+const (
+	FlavorKotlin = iota
+	FlavorJava
+)
+
 // Generator is the type whose methods generate the output, stored in the associated response structure.
 type Generator struct {
 	*bytes.Buffer
@@ -32,6 +37,7 @@ type Generator struct {
 	ValueObjectPackage string // Java value object output package
 	NoTime             bool   // DO NOT generate timestamp in header
 
+	flavor           int                        // Java or Kotlin
 	allFiles         []*FileDescriptor          // All files in the tree
 	allFilesByName   map[string]*FileDescriptor // All files by input filename.
 	genFiles         []*FileDescriptor          // Those files we will generate output for.
@@ -84,6 +90,12 @@ func (g *Generator) CommandLineParameters(parameter string) {
 			g.ValueObjectPackage = paramToJavaPackage(v)
 		case "notime":
 			g.NoTime = strings.EqualFold(v, "true")
+		case "flavor":
+			if strings.EqualFold(v, "java") {
+				g.flavor = FlavorJava
+			} else {
+				g.flavor = FlavorKotlin
+			}
 		}
 	}
 
@@ -191,7 +203,7 @@ func (g *Generator) fileByName(filename string) *FileDescriptor {
 	return g.allFilesByName[filename]
 }
 
-// BuildTypeNameMap builds the map from fully qualified type names to objects.
+// BuildTypeNameMap builds the map from fully qualified type names to object.
 // The key names for the map come from the input data, which puts a period at the beginning.
 // It should be called after SetPackageNames and before GenerateAllFiles.
 func (g *Generator) BuildTypeNameMap() {
@@ -215,7 +227,7 @@ func (g *Generator) BuildTypeNameMap() {
 	}
 }
 
-// ObjectNamed, given fully-qualified input type name as it appears in the input data,
+// ObjectNamed given fully-qualified input type name as it appears in the input data,
 // returns the descriptor for the message or enum with that name
 func (g *Generator) ObjectNamed(typeName string) Object {
 	o, ok := g.typeNameToObject[typeName]
@@ -358,6 +370,12 @@ func (g *Generator) GenerateAllFiles() {
 // Fill the response protocol buffer with the generated output for all the descriptors in the file
 func (g *Generator) generateBeans(file *FileDescriptor) {
 	g.file = file
+
+	ext := "kt"
+	if g.flavor == FlavorJava {
+		ext = "java"
+	}
+
 	// enums
 	for _, e := range file.enum {
 		if e.parent != nil {
@@ -366,10 +384,14 @@ func (g *Generator) generateBeans(file *FileDescriptor) {
 		}
 		g.Reset()
 
-		populateEnum(g, e)
+		if g.flavor == FlavorKotlin {
+			kotlinPopulateEnum(g, e)
+		} else {
+			javaPopulateEnum(g, e)
+		}
 
 		fullPath := getFullPathComponents(g, file, e.TypeName())
-		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.kt", e.GetName()))
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.%s", e.GetName(), ext))
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(path.Join(fullPath...)),
 			Content: proto.String(g.String()),
@@ -384,10 +406,14 @@ func (g *Generator) generateBeans(file *FileDescriptor) {
 		}
 		g.Reset()
 
-		populateDescriptor(g, d)
+		if g.flavor == FlavorKotlin {
+			kotlinPopulateDescriptor(g, d)
+		} else {
+			javaPopulateDescriptor(g, d)
+		}
 
 		fullPath := getFullPathComponents(g, file, d.TypeName())
-		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.kt", d.GetName()))
+		fullPath = append(fullPath[:len(fullPath)-1], fmt.Sprintf("%s.%s", d.GetName(), ext))
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
 			Name:    proto.String(path.Join(fullPath...)),
 			Content: proto.String(g.String()),

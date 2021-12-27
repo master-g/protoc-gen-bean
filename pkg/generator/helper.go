@@ -131,6 +131,133 @@ func paramToJavaPackage(param string) string {
 // javaType returns a string representing the type name, and the wire type
 func javaType(field *descriptor.FieldDescriptorProto) (typeName, defaultValue string) {
 	repeat := isRepeated(field)
+	isOneOf := field.OneofIndex != nil
+	defaultValue = "null"
+	switch *field.Type {
+	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
+		if repeat {
+			typeName = "List<Double>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "double"
+			defaultValue = "0.0"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+			if !repeat {
+				typeName = "Double"
+			}
+		}
+
+	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
+		if repeat {
+			typeName = "List<Float>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "float"
+			defaultValue = "0f"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+			if !repeat {
+				typeName = "Float"
+			}
+		}
+	case descriptor.FieldDescriptorProto_TYPE_INT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_UINT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SINT64:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_FIXED64:
+		if repeat {
+			typeName = "List<Long>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "long"
+			defaultValue = "0L"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+			if !repeat {
+				typeName = "Long"
+			}
+		}
+	case descriptor.FieldDescriptorProto_TYPE_INT32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_UINT32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_FIXED32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
+		fallthrough
+	case descriptor.FieldDescriptorProto_TYPE_SINT32:
+		if repeat {
+			typeName = "List<Integer>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "int"
+			defaultValue = "0"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+			if !repeat {
+				typeName = "Integer"
+			}
+		}
+	case descriptor.FieldDescriptorProto_TYPE_BOOL:
+		if repeat {
+			typeName = "List<Boolean>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "boolean"
+			defaultValue = "false"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+			if !repeat {
+				typeName = "Boolean"
+			}
+		}
+	case descriptor.FieldDescriptorProto_TYPE_STRING:
+		if repeat {
+			typeName = "List<String>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "String"
+			defaultValue = "\"\""
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+		}
+	case descriptor.FieldDescriptorProto_TYPE_BYTES:
+		if repeat {
+			typeName = "List<byte[]>"
+			defaultValue = "new ArrayList<>()"
+		} else {
+			typeName = "byte[]"
+			defaultValue = "new byte[]{}"
+		}
+
+		if isOneOf {
+			defaultValue = "null"
+		}
+	}
+
+	return
+}
+
+// kotlinType returns a string representing the type name, and the wire type
+func kotlinType(field *descriptor.FieldDescriptorProto) (typeName, defaultValue string) {
+	repeat := isRepeated(field)
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 		if repeat {
